@@ -1,4 +1,4 @@
-function [segmentedFrame] = sticker_classifier(frame)
+function [segmentedFrame] = sticker_predict(frame)
 %hyper-parameters
     hueMin = 0.206;
     huMax = 0.461;

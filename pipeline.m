@@ -1,19 +1,25 @@
+%TODO: add paths of subfolders directly in code
 frame_skip=4; %how much frames to skip
 infant_numbers=1:1:1; %this array defines which infants should we process
 model_name='CapNet';
 start_frame_number=0;
-source_files = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
+%source_files = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
+source_files = dir('C:\Globus\emberson-consortium\VideoRecon\MATLAB\model\MVI_0595.MP4'); %replace with location of raw vid files
 vid_sub_folders= 'E:\globus_data\infant' %hopefully videos are in subdirectories called "infant x"
-tool_path='E:\MATLAB\cap_classifier\VisualSFM_windows_64bit\VisualSFM'; %change to visualSFM tool path
+%tool_path='E:\MATLAB\cap_classifier\VisualSFM_windows_64bit\VisualSFM';
+tool_path='C:\Program Files\VisualSFM_windows_64bit\VisualSFM'; %Path of VisualSFM executable file
 %if not edit code below to extract only infant which user required above ("infant_numbers")
-use_video=true;
+use_video=true; %TODO: make parameter?
 %%%%%%%%%start%%%%%%%%%
-data=load(fullfile('capnet',filesep,'model.mat'));
-net=data.net;
+data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
+net = data.net;
+
+% TODO: Make this optional in case we want to filter only specific infants
 infant_to_search=[repmat('E:\globus_data\infant',length(infant_numbers),1),string(infant_numbers)']; %take only infants mentioned
 infant_to_search=strcat(infant_to_search(:,1),infant_to_search(:,2));
 [Lia,Locb]=ismember(infant_to_search,{source_files.folder});
 index=1;
+%for i=1:1:1
 for i=Locb'
     frameCounter=0;
     %create output directory if needed
@@ -26,8 +32,8 @@ for i=Locb'
         v=VideoReader([source_files(i).folder,filesep, source_files(i).name]);
         while hasFrame(v)
             frame=readFrame(v);
-            capImage=CapNet_classifier(frame,net);
-            stickerImage=sticker_classifier(frame);
+            capImage=capnet_predict(frame,net);
+            stickerImage=sticker_predict(frame);
             erodedImage=imerode(stickerImage,ones(10));
             finalImage = imdilate(erodedImage,ones(10)) | capImage;
             maskedRgbImage = bsxfun(@times, frame, cast(finalImage, 'like', frame));

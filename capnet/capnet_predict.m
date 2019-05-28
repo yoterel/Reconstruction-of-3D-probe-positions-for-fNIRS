@@ -1,4 +1,4 @@
-function [segmentedFrame] = predict(frame,net)
+function [segmentedFrame] = capnet_predict(frame,net)
     resizedFrame=imresize(frame,[360 480]);
     resizedSegmentedFrame=semanticseg(resizedFrame, net);
     %cat_segmentedFrame=imresize(resizedSegmentedFrame,[1080 1920]);
