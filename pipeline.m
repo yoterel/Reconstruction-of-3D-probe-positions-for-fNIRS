@@ -1,4 +1,5 @@
 addpath('helper_functions', 'capnet', 'sticker_classifier')
+
 frame_skip = 4; %how much frames to skip
 model_name = 'CapNet';
 start_frame_number = 0;
@@ -8,6 +9,9 @@ source_files = dir('C:\Globus\emberson-consortium\VideoRecon\MATLAB\model\MVI_05
 tool_path = 'C:\Program Files\VisualSFM_windows_64bit\VisualSFM'; %Path of VisualSFM executable file
 %if not edit code below to extract only infant which user required above ("infant_numbers")
 use_video=true; %TODO: make parameter?
+imgResultFilePrefix = "img_result";
+connectionsFileName = "connections.txt";
+
 %%%%%%%%%start%%%%%%%%%
 data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
 net = data.net;
@@ -23,23 +27,26 @@ index=1;
 %file_indices = Locb';
 file_indices = 1:length(source_files);
 
-imgResultFilePrefix = "img_result";
-connectionsFilePath = "connections.txt";
 for i=file_indices
+    fprintf("Processing file number %d\n", i);
+    
     % Create output directory if needed
     folder = pwd;   % Make it a subfolder of the folder where this m-file lives.
-    outputFolder = sprintf('%s/%s_classifier_results/infant%d_results_stride_%d', pwd, model_name, infant_numbers(index), frame_skip+1);
+    outputFolder = sprintf('%s%s%s_classifier_results%sinfant%d_results_stride_%d', pwd, filesep, model_name, filesep, infant_numbers(index), frame_skip+1);
     if ~exist(outputFolder, 'dir')
       mkdir(outputFolder);
     end
     frameCounter = 0;
+        
     if (use_video)
+        fprintf("Reading video\n");
         v = VideoReader([source_files(i).folder,filesep, source_files(i).name]);
+        fprintf("Finished reading video, processing frames\n");
         while hasFrame(v)
             frame = readFrame(v);
-            processFrame(frame, imgResultFilePrefix);
+            processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
             frameCounter = frameCounter+frame_skip+1;
-            disp(['curTime: ', num2str(v.CurrentTime),' curFrame: ', num2str(frameCounter)]);
+            fprintf("curTime: %d curFrame: %d\n", v.CurrentTime, frameCounter);
             temp_counter=0;
             while (temp_counter<frame_skip)
                 try
@@ -51,25 +58,27 @@ for i=file_indices
             end   
         end
     else
-        imgFolder = fullfile(source_files(i).folder,filesep,'images');
+        imgFolder = fullfile(source_files(i).folder,filesep, 'images');
+        fprintf("Loading images\n");
         imgSet = imageSet(imgFolder);
+        fprintf("Loaded images, processing frames\n");
         j=1;
         while (j<=imgSet.Count)
             frame = read(imgSet,j);
-            processFrame(frame, imgResultFilePrefix);
+            processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
             frameCounter = frameCounter+frame_skip+1;
-            disp(['curTime: ', num2str(v.CurrentTime),' curFrame: ', num2str(frameCounter)]);
+            fprintf("curFrame: %d\n", frameCounter);
             j = j + frame_skip;
         end
     end
-    makeListAndConnection(outputFolder, round(v.frameRate), frame_skip, imgResultFilePrefix, connectionsFilePath);
-    command_line = [' sfm+pairs+sfm+pmvs ', outputFolder, filesep, 'list.txt',' dense.nvm ', outputFolder, filesep, connectionsFilePath];
+    makeListAndConnection(outputFolder, round(v.frameRate), frame_skip, imgResultFilePrefix, connectionsFileName);
+    command_line = [' sfm+pairs+sfm+pmvs ', outputFolder, filesep, 'list.txt',' dense.nvm ', outputFolder, filesep, connectionsFileName];
     system([tool_path, command_line]);
     index = index+1;
 end 
 
-function processFrame(frame, imgResultFilePrefix)
-    capImage = capnet_predict(frame,net);
+function processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder)
+    capImage = capnet_predict(frame, net);
     stickerImage = sticker_predict(frame);
     erodedImage = imerode(stickerImage, ones(10));
     finalImage = imdilate(erodedImage, ones(10)) | capImage;
