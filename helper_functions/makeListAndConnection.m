@@ -1,8 +1,8 @@
-function makeListAndConnection(pathname,framerate,skip_frames)
+function makeListAndConnection(pathname, framerate,skip_frames, imgResultFilePrefix, connectionsFilePath)
 %sparseConnectionRadius = 240;
 denseConnectionRadius = round(framerate / (skip_frames+1));
-connectfid = fopen([pathname,filesep,'connections.txt'],'wt');
-filelist = dir([pathname,filesep,'img_result*.jpg']);
+connectfid = fopen([pathname,filesep, connectionsFilePath],'wt');
+filelist = dir([pathname,filesep, strcat(imgResultFilePrefix, '*.jpg')]);
 listfid = fopen([pathname,filesep,'list.txt'],'wt');
 for ii = 1:length(filelist)
     fprintf(listfid,[filelist(ii).name,'\n']);

@@ -1,9 +1,10 @@
 function [segmentedFrame] = sticker_predict(frame)
-%hyper-parameters
+    %hyper-parameters
     hueMin = 0.206;
     huMax = 0.461;
     hueRange=[hueMin, huMax];
-%classifier
+    
+    %classifier
     [hueImage, satImage, ~] = rgb2hsv(frame);
     % apply otsu thresholding for brightness
     satThreshold=graythresh(satImage);
