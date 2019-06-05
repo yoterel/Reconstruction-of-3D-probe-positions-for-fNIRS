@@ -1,9 +1,5 @@
-function [] = plyToPOS(fullPlyFileName)
-[workingDir,fileName,ext] = fileparts(fullPlyFileName);
-workingDir = [workingDir,filesep];
-filelist = dir([workingDir,'CONS_*.TXT']);
-ShimadzuFile = filelist.name;
-load(['stickerHSV.txt'],'stickerHSV');
+function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath)
+[workingDir, ~, ~] = fileparts(fullPlyFileName);
 trgShade = stickerHSV(1);
 groupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
@@ -20,8 +16,9 @@ candidates = vertices(idxs,:);
 plot3(vertices(idxs,1),vertices(idxs,2),vertices(idxs,3),'.');
 [capSphereC, capSphereR] = sphereFit(candidates);
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
-% load(['model',filesep,'modelMNI.mat']); 
-load(['FixModelMNI.mat']); 
+%load(['model',filesep,'modelMNI.mat']); 
+%load(['FixModelMNI.mat']); 
+load(mniModelPath);
 
 headAndCapIdxs = length(modelMNI.X)-8:length(modelMNI.X);
 modelStars = [modelMNI.X(headAndCapIdxs),modelMNI.Y(headAndCapIdxs),modelMNI.Z(headAndCapIdxs)]; 
@@ -40,7 +37,7 @@ for v = 1:length(candidates)
     distMatrix(:,v) = sqrt(sum([candidates(:,1)-candidates(v,1) candidates(:,2)-candidates(v,2) candidates(:,3)-candidates(v,3)].^2,2));
 end
 adjMatrix(distMatrix < thr) = 1;
-[labels rts] = graph_connected_components(adjMatrix);
+[labels, ~] = graphConnectedComponents(adjMatrix);
 figure; axis equal; hold on
 counter = zeros(max(labels),1);
 mids = zeros(max(labels),3);
@@ -233,6 +230,8 @@ scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(mod
 % use fiber points from resulting model to estimate positions.
 %% create files for spm_fnirs and for Homer2
 
+filelist = dir(strcat(workingDir, filesep, "CONS_*.TXT"));
+ShimadzuFile = filelist.name;
 [Ch,Source,Detector] = importChCfgFromShimadzuTXTfile([workingDir,ShimadzuFile]);
 nChannels = length(Ch);
 nOptodes = length(unique(Source))+length(unique(Detector));

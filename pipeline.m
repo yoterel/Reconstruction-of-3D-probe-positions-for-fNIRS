@@ -1,4 +1,4 @@
-addpath('helper_functions', 'capnet', 'sticker_classifier')
+addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 
 % TODO: make configurable?
 % Parameters for the run
@@ -11,6 +11,8 @@ toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"'; %Path of Visu
 useVideo = true;
 imgResultFilePrefix = "img_result";
 connectionsFileName = "connections.txt";
+vsfmOutputFileName = "dense"; % Name of nvm file outputed by VSFM
+mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
 
 %%%%%%%%%start%%%%%%%%%
 data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
@@ -31,73 +33,21 @@ for i = fileIndices
     fprintf("Processing file number %d\n", i);
     
     % Create output directory if needed
-    folder = pwd;   % Make it a subfolder of the folder where this m-file lives.
     outputFolder = sprintf('%s%s%s_classifier_results%sinfant%d_results_stride_%d', pwd, filesep, modelName, filesep, infantNumbers(index), frameSkip+1);
     if ~exist(outputFolder, 'dir')
       mkdir(outputFolder);
     end
     
-    frameCounter = 0;
-    if (useVideo)
-        fprintf("Reading video\n");
-        v = VideoReader([sourceFiles(i).folder,filesep, sourceFiles(i).name]);
-        fprintf("Finished reading video, processing frames\n");
-        while hasFrame(v)
-            frame = readFrame(v);
-            processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
-            frameCounter = frameCounter+frameSkip+1;
-            fprintf("curTime: %d curFrame: %d\n", v.CurrentTime, frameCounter);
-            tempCounter=0;
-            while (tempCounter < frameSkip)
-                try
-                    frame = readFrame(v);
-                    tempCounter = tempCounter+1;
-                catch ME
-                    break;
-                end
-            end   
-        end
-    else
-        imgFolder = fullfile(sourceFiles(i).folder,filesep, 'images');
-        fprintf("Loading images\n");
-        imgSet = imageSet(imgFolder);
-        fprintf("Loaded images, processing frames\n");
-        j=1;
-        while (j<=imgSet.Count)
-            frame = read(imgSet,j);
-            processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
-            frameCounter = frameCounter+frameSkip+1;
-            fprintf("curFrame: %d\n", frameCounter);
-            j = j + frameSkip;
-        end
-    end
-    
-    makeListAndConnection(outputFolder, round(v.frameRate), frameSkip, imgResultFilePrefix, connectionsFileName);
-    runVSFM(outputFolder, connectionsFileName);
+    createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, imgResultFilePrefix, outputFolder);    
+    makeListAndConnection(outputFolder, round(v.frameRate), frameSkip, imgResultFilePrefix, connectionsFileName); %TODO: v is undefined if not using video. What should we pass instead?
+    runVSFM(outputFolder, connectionsFileName, vsfmOutputFileName); 
+    %load('C:\Globus\emberson-consortium\VideoRecon\MATLAB\stickerHSV.txt', 'stickerHSV');
+    %plyToPOS(sprintf("%s%s%s.0.ply", outputFolder, filesep, vsfmOutputFileName), stickerHSV, mniModelPath);
     index = index+1;
-end 
-
-function processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder)
-    capImage = capnet_predict(frame, net);
-    stickerImage = sticker_predict(frame);
-    erodedImage = imerode(stickerImage, ones(10));
-    finalImage = imdilate(erodedImage, ones(10)) | capImage;
-    maskedRgbImage = bsxfun(@times, frame, cast(finalImage, 'like', frame));
-    writeImages(maskedRgbImage, finalImage, frameCounter, outputFolder, imgResultFilePrefix);    
 end
 
-% Saves 2 image results from a frame (finalImage + maskedRgbImage to output folder
-function writeImages(maskedRgbImage, finalImage, frameCounter, outputFolder, imgResultFilePrefix)
-    fileName1 = sprintf('img_mask%04d.jpg', frameCounter);
-    fileName2 = sprintf('%s%04d.jpg', imgResultFilePrefix, frameCounter);
-    outputFullFileName = fullfile(outputFolder, fileName1);
-    imwrite(finalImage, outputFullFileName, 'jpg');
-    outputFullFileName = fullfile(outputFolder, fileName2);
-    imwrite(maskedRgbImage, outputFullFileName, 'jpg'); 
-end
-
-function runVSFM(outputFolder, connectionsFileName, toolPath)
-    args = strcat(" sfm+pairs+sfm+pmvs ", outputFolder, filesep, 'list.txt', " dense.nvm ", outputFolder, filesep, connectionsFileName);
+function runVSFM(outputFolder, connectionsFileName, toolPath, vsfmOutputFileName)
+    args = strcat(" sfm+pairs+sfm+pmvs ", outputFolder, filesep, "list.txt ", vsfmOutputFileName, ".nvm ", outputFolder, filesep, connectionsFileName);
     vsfmCmd = strcat(toolPath, args);
     fprintf("Running VisualSMF with the following command:\n%s\n", vsfmCmd);
     system(vsfmCmd);
