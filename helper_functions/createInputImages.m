@@ -1,4 +1,5 @@
-function [frameRate] = createInputImages(useVideo, sourceFile, net, imgResultFilePrefix, outputFolder, frameSkip)
+function [frameRate] = createInputImages(useVideo, sourceFile, net, imgResultFilePrefix, ...
+    outputFolder, frameSkip)
 %CREATEINPUTIMAGES Creates a set of input images for mesh reconstruction
 %(usually through VSFM)
 frameCounter = 0;

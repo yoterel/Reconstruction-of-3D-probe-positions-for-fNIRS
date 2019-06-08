@@ -1,5 +1,7 @@
-function makeListAndConnection(pathname, framerate, skip_frames, imgResultFilePrefix, connectionsFileName)
-%sparseConnectionRadius = 240;
+function makeListAndConnection(pathname, framerate, skip_frames, imgResultFilePrefix, ...
+    connectionsFileName)
+%makeListAndConnection creates metadata text files required by VisualSFM
+%for mesh reconstruction
 denseConnectionRadius = round(framerate / (skip_frames+1));
 connectionsFilePath = strcat(pathname, filesep, connectionsFileName);
 fprintf("Creating output file: %s\n", connectionsFilePath);

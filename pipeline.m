@@ -2,21 +2,22 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 
 % TODO: make configurable?
 % Parameters for the run
-frameSkip = 4; % How much frames to skip (process 1 frame in each frameSkip + 1 frames)
-modelName = 'CapNet';
-%sourceFiles = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
-sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4'); %replace with location of raw vid files
 %toolPath = 'E:\MATLAB\cap_classifier\VisualSFM_windows_64bit\VisualSFM';
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"'; %Path of VisualSFM executable file
-useVideo = true;
-imgResultFilePrefix = "img_result";
+%sourceFiles = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
+sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4'); %replace with location of raw vid files
+mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\infantModelMNI.mat"; % Used by plyToPOS.m
+nirsModelPath = "C:\Globus\emberson-consortium\VideoRecon\results\infant1\NIRS_infant.mat"; % Used by plyToPos.m
+frameSkip = 4; % How much frames to skip (process 1 frame in each frameSkip + 1 frames
+useVideo = true; % Whether to use a video file directly or already extracted frame images
+shimadzuFileName = "infant"; % Name of shimadzu output file in the video directory
+
+% Inner use consts
 connectionsFileName = "connections.txt";
 vsfmOutputFileName = "dense"; % Name of nvm file outputed by VSFM
-mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
-shimadzuFileName = "infant";
-nirsModelPath = "C:\Globus\emberson-consortium\VideoRecon\results\infant1\NIRS_infant.mat";
+imgResultFilePrefix = "img_result";
 
-%%%%%%%%%start%%%%%%%%%
+%%%%%%%%% Start %%%%%%%%%
 data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
 net = data.net;
 
@@ -36,13 +37,16 @@ for i = fileIndices
     
     % TODO: use video folder name for output folder?
     % Create output directory if needed
-    outputFolder = sprintf('%s%s%s_classifier_results%sinfant%d_results_stride_%d', pwd, filesep, modelName, filesep, infantNumbers(index), frameSkip+1);
+    outputFolder = sprintf('%s%sCapNet_classifier_results%sinfant%d_results_stride_%d', ...
+        pwd, filesep, filesep, infantNumbers(index), frameSkip+1);
     if ~exist(outputFolder, 'dir')
       mkdir(outputFolder);
     end
         
-    frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, outputFolder, frameSkip);    
-    makeListAndConnection(outputFolder, round(frameRate), frameSkip, imgResultFilePrefix, connectionsFileName);
+    frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, ...
+        outputFolder, frameSkip);    
+    makeListAndConnection(outputFolder, round(frameRate), frameSkip, imgResultFilePrefix, ...
+        connectionsFileName);
     runVSFM(outputFolder, connectionsFileName, toolPath, vsfmOutputFileName);
     
     % Video folder should also contain a stickerHSV.txt file (information on sticker locations)
@@ -58,7 +62,8 @@ for i = fileIndices
 end
 
 function runVSFM(outputFolder, connectionsFileName, toolPath, vsfmOutputFileName)
-    args = strcat(" sfm+pairs+sfm+pmvs ", outputFolder, filesep, "list.txt ", vsfmOutputFileName, ".nvm ", outputFolder, filesep, connectionsFileName);
+    args = strcat(" sfm+pairs+sfm+pmvs ", outputFolder, filesep, "list.txt ", ...
+        vsfmOutputFileName, ".nvm ", outputFolder, filesep, connectionsFileName);
     vsfmCmd = strcat(toolPath, args);
     fprintf("Running VisualSMF with the following command:\n%s\n", vsfmCmd);
     system(vsfmCmd);
