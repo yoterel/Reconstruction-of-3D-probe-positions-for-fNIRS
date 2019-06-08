@@ -1,4 +1,5 @@
-function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, nirsModelPath)
+function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
+    nirsModelPath)
 trgShade = stickerHSV(1);
 groupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
@@ -175,7 +176,7 @@ modelLabels = [modelMNI.labels];
 
 % perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
-fprintf("Performing grid search of axix-aligned scaling\n");
+fprintf("Performing grid search of axis-aligned scaling\n");
 capHeadIdxs = ismember(capLabels,{'Nz','Cz','AR','AL'});
 modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'});
 capCapIdxs = ismember(capLabels,{'Front','Cz','Right','Left','Pz','Iz'});

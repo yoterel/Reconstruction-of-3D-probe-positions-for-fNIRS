@@ -6,7 +6,7 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"'; %Path of VisualSFM executable file
 %sourceFiles = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
 sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4'); %replace with location of raw vid files
-mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\infantModelMNI.mat"; % Used by plyToPOS.m
+mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat"; % Used by plyToPOS.m
 nirsModelPath = "C:\Globus\emberson-consortium\VideoRecon\results\infant1\NIRS_infant.mat"; % Used by plyToPos.m
 frameSkip = 4; % How much frames to skip (process 1 frame in each frameSkip + 1 frames
 useVideo = true; % Whether to use a video file directly or already extracted frame images
@@ -37,26 +37,26 @@ for i = fileIndices
     
     % TODO: use video folder name for output folder?
     % Create output directory if needed
-    outputFolder = sprintf('%s%sCapNet_classifier_results%sinfant%d_results_stride_%d', ...
+    outputDir = sprintf('%s%sCapNet_classifier_results%sinfant%d_results_stride_%d', ...
         pwd, filesep, filesep, infantNumbers(index), frameSkip+1);
-    if ~exist(outputFolder, 'dir')
-      mkdir(outputFolder);
+    if ~exist(outputDir, 'dir')
+      mkdir(outputDir);
     end
         
     frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, ...
-        outputFolder, frameSkip);    
-    makeListAndConnection(outputFolder, round(frameRate), frameSkip, imgResultFilePrefix, ...
+        outputDir, frameSkip);    
+    makeListAndConnection(outputDir, round(frameRate), frameSkip, imgResultFilePrefix, ...
         connectionsFileName);
-    runVSFM(outputFolder, connectionsFileName, toolPath, vsfmOutputFileName);
+    runVSFM(outputDir, connectionsFileName, toolPath, vsfmOutputFileName);
     
     % Video folder should also contain a stickerHSV.txt file (information on sticker locations)
     % and an infant.txt file (the Shimadzu output file)
     vidDir = sourceFiles(i).folder;
     load(strcat(vidDir, filesep, "stickerHSV.txt"), 'stickerHSV');
     shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
-    plyFilePath = strcat(outputFolder, filesep, vsfmOutputFileName, ".0.ply");
+    plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
-    plyToPOS(plyFilePath, stickerHSV, mniModelPath, nirsModelPath);
+    plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, nirsModelPath);
     
     index = index+1;
 end
