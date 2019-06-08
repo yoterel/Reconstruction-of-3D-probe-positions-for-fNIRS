@@ -1,4 +1,4 @@
-function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir)
+function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, nirsModelPath)
 trgShade = stickerHSV(1);
 groupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
@@ -332,9 +332,7 @@ fprintf("Running spm_fnirs");
 F{1,1}(1,:) = referencePositionFilePath;
 F{1,1}(2,:) = optodePositionsFilePath;
 F{1,1}(3,:) = channelConfigOutputFilePath;
-% TODO: figure out what this file is
-%filelist = dir([workingDir,'NIRS_*.mat']);
-%F{2,1} = [workingDir,filelist.name];
-%spm_fnirs_spatialpreproc_ui(F);
+F{2,1} = nirsModelPath;
+spm_fnirs_spatialpreproc_ui(F);
     
 close all

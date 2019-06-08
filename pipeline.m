@@ -14,6 +14,7 @@ connectionsFileName = "connections.txt";
 vsfmOutputFileName = "dense"; % Name of nvm file outputed by VSFM
 mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
 shimadzuFileName = "infant";
+nirsModelPath = "C:\Globus\emberson-consortium\VideoRecon\results\infant1\NIRS_infant.mat";
 
 %%%%%%%%%start%%%%%%%%%
 data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
@@ -51,7 +52,7 @@ for i = fileIndices
     shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
     plyFilePath = strcat(outputFolder, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
-    plyToPOS(plyFilePath, stickerHSV, mniModelPath);
+    plyToPOS(plyFilePath, stickerHSV, mniModelPath, nirsModelPath);
     
     index = index+1;
 end
