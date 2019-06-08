@@ -1,13 +1,13 @@
-function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath)
-[workingDir, ~, ~] = fileparts(fullPlyFileName);
+function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir)
 trgShade = stickerHSV(1);
 groupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
-% manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
+%manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
 manualPoints = [];
 
 mesh = plyread(fullPlyFileName);
+fprintf("Finished reading ply file\n");
 vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
 verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
 verColorsHSV = rgb2hsv(double(verColors)/255);
@@ -15,17 +15,20 @@ idxs = find(abs(verColorsHSV(:,1)-trgShade) < 0.15 & ((verColorsHSV(:,2) > 0.2 &
 candidates = vertices(idxs,:);
 plot3(vertices(idxs,1),vertices(idxs,2),vertices(idxs,3),'.');
 [capSphereC, capSphereR] = sphereFit(candidates);
+fprintf("Performed sphere fit 1\n");
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
 %load(['model',filesep,'modelMNI.mat']); 
 %load(['FixModelMNI.mat']); 
 load(mniModelPath);
+fprintf("Loaded MNI model\n");
 
 headAndCapIdxs = length(modelMNI.X)-8:length(modelMNI.X);
 modelStars = [modelMNI.X(headAndCapIdxs),modelMNI.Y(headAndCapIdxs),modelMNI.Z(headAndCapIdxs)]; 
 modelLabels = modelMNI.labels(headAndCapIdxs);
 [modelSphereC,modelSphereR] = sphereFit([modelMNI.X,modelMNI.Y,modelMNI.Z]);
+fprintf("Performed sphere fit 2\n")
 %modelStars = modelStars*capSphereR/modelSphereR-modelSphereC+capSphereC; % scale and translate model to fit cap
-candidates = candidates*modelSphereR/capSphereR+modelSphereC-capSphereC;
+candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 %%
 % bbox = [max(vertices); min(vertices)];
 % radius = sqrt(sum((bbox(1,:)-bbox(2,:)).^2));
@@ -100,8 +103,10 @@ modelTripletOrder = nchoosek(1:size(existStars,1),3);
 w = 0.7;
 bestD = inf;
 outlierThr = capSphereR;
+fprintf("Processing triplets\n");
+% TODO: maybe there's a way to accelerate this part? Use all cores?
 for ii = 1:size(modelTripletOrder,1)
-    ii
+    fprintf("Triplet number %d\n", ii);
     modelTriplet = existStars(modelTripletOrder(ii,:),:);
 %     tModelStars = zeros(size(existStars));
 %     for jj = 1:size(existStars,1)
@@ -144,7 +149,8 @@ for ii = 1:size(modelTripletOrder,1)
     end
 end
 %%
-[idx,d] = knnsearch(bestProjStars,capStars);
+[idx,d] = knnsearch(bestProjStars, capStars);
+fprintf("Performed knn search 1\n");
 %capStarsEnum = 1:size(capStars,1);
 [B, I] = sort(d);
 [C,IA] = unique(idx(I));
@@ -169,6 +175,7 @@ modelLabels = [modelMNI.labels];
 
 % perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
+fprintf("Performing grid search of axix-aligned scaling\n");
 capHeadIdxs = ismember(capLabels,{'Nz','Cz','AR','AL'});
 modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'});
 capCapIdxs = ismember(capLabels,{'Front','Cz','Right','Left','Pz','Iz'});
@@ -201,7 +208,7 @@ for scX = scalespace
 end
 
 % rotate + scale model to the best aligned result.
-
+fprintf("Perfroming rotations & scaling\n");
 scaledCap = [capStars.*bestScale ones(size(capStars,1),1)]*bestReg.M';
 scaledCap = scaledCap(:,1:3);
 %scaledModel = [modelPoints.*bestScale ones(size(modelPoints,1),1)]*bestReg.M';
@@ -228,11 +235,10 @@ scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
 scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
 scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(modelCapIdxs,3))
 % use fiber points from resulting model to estimate positions.
-%% create files for spm_fnirs and for Homer2
 
-filelist = dir(strcat(workingDir, filesep, "CONS_*.TXT"));
-ShimadzuFile = filelist.name;
-[Ch,Source,Detector] = importChCfgFromShimadzuTXTfile([workingDir,ShimadzuFile]);
+%% create files for spm_fnirs and for Homer2
+fprintf("Creating files for spm_fnirs\n");
+[Ch,Source,Detector] = importChCfgFromShimadzuTXTfile(shimadzuFilePath);
 nChannels = length(Ch);
 nOptodes = length(unique(Source))+length(unique(Detector));
 subX = modelOnCapCap(:,1);
@@ -245,10 +251,10 @@ subY(modelHeadIdxs) = bestCapHead(:,2);
 subZ(modelHeadIdxs) = bestCapHead(:,3);
 
 refNames = {'nz';'ar';'al';'cz';'iz'};
-fid = fopen([workingDir,'digits.txt'],'w');
+fid = fopen(fullfile(outputDir, "digits.txt"), 'w');
 for ref = 1:length(refNames)
     ind = find(strcmpi(subName,refNames{ref}));
-    fprintf(fid,'%s: %f %f %f\n',refNames{ref},subX(ind),subY(ind),subZ(ind));
+    fprintf(fid, '%s: %f %f %f\n', refNames{ref},subX(ind),subY(ind),subZ(ind));
 end
 
 SD.Lambda = [780;805;830];
@@ -259,23 +265,24 @@ SD.DetPos = zeros(SD.nDets,3);
 for src = 1:SD.nSrcs
     ind = find(strcmp(subName,['R',num2str(src)]));
     SD.SrcPos(src,:) = [subX(ind),subY(ind),subZ(ind)];
-    fprintf(fid,'s%i: %f %f %f\n',src,subX(ind),subY(ind),subZ(ind));
+    fprintf(fid, 's%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
 end
 for det = 1:SD.nDets
     ind = find(strcmp(subName,['T',num2str(det)]));
     SD.DetPos(det,:) = [subX(ind),subY(ind),subZ(ind)];
-    fprintf(fid,'d%i: %f %f %f\n',src,subX(ind),subY(ind),subZ(ind));
+    fprintf(fid, 'd%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
 end
 fclose(fid);
 SD.MeasList = [repmat([Source,Detector],3,1),ones(nChannels*3,1),[ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
 SD.MeasListAct = ones(size(SD.MeasList,1),1);
 SD.SpatialUnit = 'mm';
-% [pathName,prevName] = fileparts([ShimadzuPath,ShimadzuFile]);
-save([workingDir,'SD.SD'],'SD','-mat')
-Shimadzu2nirsSingleFile([workingDir,ShimadzuFile]);
-txt2nirs([workingDir,ShimadzuFile]);
+% [pathName,prevName] = fileparts([ShimadzuPath,shimadzuFilePath]);
+save(fullfile(outputDir, "SD.SD"), 'SD', '-mat')
+Shimadzu2nirsSingleFile(shimadzuFilePath);
+txt2nirs(shimadzuFilePath);
 
 %% export optode position
+fprintf("Exporting optode position\n");
 Optode = cell(nOptodes,1);
 X = nan(nOptodes,1);
 Y = nan(nOptodes,1);
@@ -292,8 +299,11 @@ for optInd = 1:(nOptodes/2)
     Z(optInd + nOptodes/2) = subZ(strcmp(subName,['R',num2str(optInd)]));
 end
 outputTable = table(Optode,X,Y,Z);
-writetable(outputTable,[workingDir,'optode_positions.csv'])
+optodePositionsFilePath = strcat(outputDir, "optode_positions.csv");
+writetable(outputTable, optodePositionsFilePath);
+
 %% export reference position
+fprintf("Exporting reference position\n");
 Reference = {'NzHS';'IzHS';'ARHS';'ALHS';'Fp1HS';'Fp2HS';'FzHS';'F3HS';...
     'F4HS';'F7HS';'F8HS';'CzHS';'C3HS';'C4HS';'T3HS';'T4HS';'PzHS';'P3HS';...
     'P4HS';'T5HS';'T6HS';'O1HS';'O2HS'};
@@ -308,20 +318,23 @@ for refInd = 1:length(refNamesFastrak)
     Z(strcmpi(Reference,refNamesSpmfnirs{refInd})) = subZ(strcmpi(subName,refNamesFastrak{refInd}));
 end
 outputTable = table(Reference,X,Y,Z);
-writetable(outputTable,[workingDir,'reference_position.csv']);
+referencePositionFilePath = strcat(outputDir, "reference_position.csv");
+writetable(outputTable, referencePositionFilePath);
 
 outputTable = table(Ch,Source,Detector);
-writetable(outputTable,[workingDir,'channel_config.csv']);
+channelConfigOutputFilePath = strcat(outputDir, "channel_config.csv");
+writetable(outputTable, channelConfigOutputFilePath);
 
-save([workingDir,'plyToPOSoutput.mat'])
+save(strcat(outputDir, "plyToPOSoutput.mat"));
 
 %% run spm_fnirs spatial tool
-F{1,1}(1,:) = [workingDir,'reference_position.csv'];
-F{1,1}(2,:) = [workingDir,'optode_positions.csv  '];
-F{1,1}(3,:) = [workingDir,'channel_config.csv    '];
-filelist = dir([workingDir,'NIRS_*.mat']);
-F{2,1} = [workingDir,filelist.name];
-spm_fnirs_spatialpreproc_ui(F);
+fprintf("Running spm_fnirs");
+F{1,1}(1,:) = referencePositionFilePath;
+F{1,1}(2,:) = optodePositionsFilePath;
+F{1,1}(3,:) = channelConfigOutputFilePath;
+% TODO: figure out what this file is
+%filelist = dir([workingDir,'NIRS_*.mat']);
+%F{2,1} = [workingDir,filelist.name];
+%spm_fnirs_spatialpreproc_ui(F);
     
 close all
-

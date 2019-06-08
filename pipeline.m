@@ -5,7 +5,7 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 frameSkip = 4; %how much frames to skip
 modelName = 'CapNet';
 %sourceFiles = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
-sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\MATLAB\model\MVI_0595.MP4'); %replace with location of raw vid files
+sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4'); %replace with location of raw vid files
 %toolPath = 'E:\MATLAB\cap_classifier\VisualSFM_windows_64bit\VisualSFM';
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"'; %Path of VisualSFM executable file
 useVideo = true;
@@ -37,12 +37,20 @@ for i = fileIndices
     if ~exist(outputFolder, 'dir')
       mkdir(outputFolder);
     end
-    
+        
     createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, imgResultFilePrefix, outputFolder);    
     makeListAndConnection(outputFolder, round(v.frameRate), frameSkip, imgResultFilePrefix, connectionsFileName); %TODO: v is undefined if not using video. What should we pass instead?
-    runVSFM(outputFolder, connectionsFileName, vsfmOutputFileName); 
-    %load('C:\Globus\emberson-consortium\VideoRecon\MATLAB\stickerHSV.txt', 'stickerHSV');
-    %plyToPOS(sprintf("%s%s%s.0.ply", outputFolder, filesep, vsfmOutputFileName), stickerHSV, mniModelPath);
+    runVSFM(outputFolder, connectionsFileName, vsfmOutputFileName);
+    
+    % Video folder should also contain a stickerHSV.txt file (information on sticker locations)
+    % and an infant.txt file (the Shimadzu output file)
+    vidDir = sourceFiles(i).folder;
+    load(strcat(vidDir, filesep, "stickerHSV.txt"), 'stickerHSV');
+    shimadzuFilePath = strcat(vidDir, filesep, "infant.txt");
+    plyFilePath = strcat(outputFolder, filesep, vsfmOutputFileName, ".0.ply");
+    fprintf("Converting .ply file to .pos file\n");
+    plyToPOS(plyFilePath, stickerHSV, mniModelPath);
+    
     index = index+1;
 end
 
