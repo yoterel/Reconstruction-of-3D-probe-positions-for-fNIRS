@@ -2,7 +2,7 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 
 % TODO: make configurable?
 % Parameters for the run
-frameSkip = 4; %how much frames to skip
+frameSkip = 4; % How much frames to skip (process 1 frame in each frameSkip + 1 frames)
 modelName = 'CapNet';
 %sourceFiles = dir('E:\globus_data\**\*.avi'); %replace with location of raw vid files
 sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4'); %replace with location of raw vid files
@@ -13,6 +13,7 @@ imgResultFilePrefix = "img_result";
 connectionsFileName = "connections.txt";
 vsfmOutputFileName = "dense"; % Name of nvm file outputed by VSFM
 mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
+shimadzuFileName = "infant";
 
 %%%%%%%%%start%%%%%%%%%
 data = load(fullfile('capnet', filesep, 'model.mat'));  %TODO: allow loading model from separate path?
@@ -32,21 +33,22 @@ fileIndices = 1:length(sourceFiles);
 for i = fileIndices
     fprintf("Processing file number %d\n", i);
     
+    % TODO: use video folder name for output folder?
     % Create output directory if needed
     outputFolder = sprintf('%s%s%s_classifier_results%sinfant%d_results_stride_%d', pwd, filesep, modelName, filesep, infantNumbers(index), frameSkip+1);
     if ~exist(outputFolder, 'dir')
       mkdir(outputFolder);
     end
         
-    createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, imgResultFilePrefix, outputFolder);    
-    makeListAndConnection(outputFolder, round(v.frameRate), frameSkip, imgResultFilePrefix, connectionsFileName); %TODO: v is undefined if not using video. What should we pass instead?
-    runVSFM(outputFolder, connectionsFileName, vsfmOutputFileName);
+    frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, outputFolder, frameSkip);    
+    makeListAndConnection(outputFolder, round(frameRate), frameSkip, imgResultFilePrefix, connectionsFileName);
+    runVSFM(outputFolder, connectionsFileName, toolPath, vsfmOutputFileName);
     
     % Video folder should also contain a stickerHSV.txt file (information on sticker locations)
     % and an infant.txt file (the Shimadzu output file)
     vidDir = sourceFiles(i).folder;
     load(strcat(vidDir, filesep, "stickerHSV.txt"), 'stickerHSV');
-    shimadzuFilePath = strcat(vidDir, filesep, "infant.txt");
+    shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
     plyFilePath = strcat(outputFolder, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
     plyToPOS(plyFilePath, stickerHSV, mniModelPath);

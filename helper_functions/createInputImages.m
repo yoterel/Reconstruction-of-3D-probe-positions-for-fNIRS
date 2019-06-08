@@ -1,22 +1,23 @@
-function createInputImages(useVideo, sourceFile, net, imgResultFilePrefix, outputFolder)
+function [frameRate] = createInputImages(useVideo, sourceFile, net, imgResultFilePrefix, outputFolder, frameSkip)
 %CREATEINPUTIMAGES Creates a set of input images for mesh reconstruction
 %(usually through VSFM)
 frameCounter = 0;
 if (useVideo)
     fprintf("Reading video\n");
     v = VideoReader([sourceFile.folder,filesep, sourceFile.name]);
+    frameRate = v.frameRate; % TODO: what shold we return as frameRate if not using video???
     fprintf("Finished reading video, processing frames\n");
     while hasFrame(v)
         frame = readFrame(v);
         processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
-        frameCounter = frameCounter+frameSkip+1;
-        fprintf("curTime: %d curFrame: %d\n", v.CurrentTime, frameCounter);
+        frameCounter = frameCounter + frameSkip + 1;
+        fprintf("curTime: %d seconds, curFrame: %04d/%04d\n", v.CurrentTime, frameCounter);
         tempCounter=0;
         while (tempCounter < frameSkip)
             try
-                frame = readFrame(v);
+                readFrame(v);
                 tempCounter = tempCounter+1;
-            catch ME
+            catch
                 break;
             end
         end   
@@ -31,7 +32,7 @@ else
         frame = read(imgSet,j);
         processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
         frameCounter = frameCounter+frameSkip+1;
-        fprintf("curFrame: %d\n", frameCounter);
+        fprintf("curFrame: %04d/%04d\n", frameCounter, imgSet.Count);
         j = j + frameSkip;
     end
 end
