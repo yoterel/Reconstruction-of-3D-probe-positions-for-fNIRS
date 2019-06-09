@@ -16,6 +16,7 @@ useVideo = true; % Whether to use a video file directly or already extracted fra
 shimadzuFileName = "infant"; % Name of shimadzu output file in the video directory
 plyToPOSgroupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 outputDirPrefix = "model";
+spmPath = "C:\Users\Dean\Documents\MATLAB\spm12"; % SPM installation path
 
 % Inner use consts
 connectionsFileName = "connections.txt";
@@ -45,14 +46,14 @@ for i = fileIndices
     outputDir = sprintf('%s%sCapNet_classifier_results%s%s%d_results_stride_%d', ...
         pwd, filesep, filesep, outputDirPrefix, infantNumbers(index), frameSkip+1);
     if ~exist(outputDir, 'dir')
-      mkdir(outputDir);
+        mkdir(outputDir);
     end
-        
-     frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, ...
-         outputDir, frameSkip);    
-     makeListAndConnection(outputDir, round(frameRate), frameSkip, imgResultFilePrefix, ...
-         connectionsFileName);
-     runVSFM(outputDir, connectionsFileName, toolPath, vsfmOutputFileName);
+    
+    frameRate = createInputImages(useVideo, sourceFiles(i), net, imgResultFilePrefix, ...
+        outputDir, frameSkip);    
+    makeListAndConnection(outputDir, round(frameRate), frameSkip, imgResultFilePrefix, ...
+        connectionsFileName);
+    runVSFM(outputDir, connectionsFileName, toolPath, vsfmOutputFileName);
      
     % Video folder should also contain a stickerHSV.txt file (information on sticker locations)
     % and an infant.txt file (the Shimadzu output file)
@@ -63,6 +64,7 @@ for i = fileIndices
     plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
     plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
+    addpath(spmPath);
     plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
         nirsModelPath, plyToPOSgroupSize);
     
