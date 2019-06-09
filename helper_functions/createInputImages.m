@@ -7,12 +7,14 @@ if (useVideo)
     fprintf("Reading video\n");
     v = VideoReader([sourceFile.folder,filesep, sourceFile.name]);
     frameRate = v.frameRate; % TODO: what shold we return as frameRate if not using video???
+    numberOfFrames = round(frameRate * v.Duration);
     fprintf("Finished reading video, processing frames\n");
     while hasFrame(v)
         frame = readFrame(v);
         processFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
         frameCounter = frameCounter + frameSkip + 1;
-        fprintf("curTime: %d seconds, curFrame: %04d/%04d\n", v.CurrentTime, frameCounter);
+        fprintf("curTime: %d seconds, curFrame: %04d/%04d\n", v.CurrentTime, frameCounter, ...
+            numberOfFrames);
         tempCounter=0;
         while (tempCounter < frameSkip)
             try

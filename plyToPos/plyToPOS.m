@@ -1,7 +1,6 @@
 function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
-    nirsModelPath)
+    nirsModelPath, groupSize)
 trgShade = stickerHSV(1);
-groupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
@@ -239,6 +238,10 @@ scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(mod
 
 %% create files for spm_fnirs and for Homer2
 fprintf("Creating files for spm_fnirs\n");
+if ~exist(outputDir, 'dir')
+    mkdir(outputDir);
+end
+
 [Ch,Source,Detector] = importChCfgFromShimadzuTXTfile(shimadzuFilePath);
 nChannels = length(Ch);
 nOptodes = length(unique(Source))+length(unique(Detector));
@@ -277,7 +280,6 @@ fclose(fid);
 SD.MeasList = [repmat([Source,Detector],3,1),ones(nChannels*3,1),[ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
 SD.MeasListAct = ones(size(SD.MeasList,1),1);
 SD.SpatialUnit = 'mm';
-% [pathName,prevName] = fileparts([ShimadzuPath,shimadzuFilePath]);
 save(fullfile(outputDir, "SD.SD"), 'SD', '-mat')
 Shimadzu2nirsSingleFile(shimadzuFilePath);
 txt2nirs(shimadzuFilePath);
@@ -300,7 +302,7 @@ for optInd = 1:(nOptodes/2)
     Z(optInd + nOptodes/2) = subZ(strcmp(subName,['R',num2str(optInd)]));
 end
 outputTable = table(Optode,X,Y,Z);
-optodePositionsFilePath = strcat(outputDir, "optode_positions.csv");
+optodePositionsFilePath = fullfile(outputDir, "optode_positions.csv");
 writetable(outputTable, optodePositionsFilePath);
 
 %% export reference position
@@ -319,14 +321,14 @@ for refInd = 1:length(refNamesFastrak)
     Z(strcmpi(Reference,refNamesSpmfnirs{refInd})) = subZ(strcmpi(subName,refNamesFastrak{refInd}));
 end
 outputTable = table(Reference,X,Y,Z);
-referencePositionFilePath = strcat(outputDir, "reference_position.csv");
+referencePositionFilePath = fullfile(outputDir, "reference_position.csv");
 writetable(outputTable, referencePositionFilePath);
 
 outputTable = table(Ch,Source,Detector);
-channelConfigOutputFilePath = strcat(outputDir, "channel_config.csv");
+channelConfigOutputFilePath = fullfile(outputDir, "channel_config.csv");
 writetable(outputTable, channelConfigOutputFilePath);
 
-save(strcat(outputDir, "plyToPOSoutput.mat"));
+save(fullfile(outputDir, "plyToPOSoutput.mat"));
 
 %% run spm_fnirs spatial tool
 fprintf("Running spm_fnirs");

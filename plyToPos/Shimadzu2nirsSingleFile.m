@@ -32,9 +32,9 @@
 function Shimadzu2nirsSingleFile(filename)
 [pathName,prevName] = fileparts(filename);
 fid = fopen(filename);
-filelist = dir([pathName,filesep,'*.SD']);
-load ([pathName,filesep,filelist.name],'-mat'); % loading SD file
-C = textscan(fid,'%s','delimiter','\n');
+filelist = dir(strcat(pathName, filesep, "*.SD"));
+load(strcat(pathName, filesep, filelist.name), '-mat'); % loading SD file
+C = textscan(fid, '%s', 'delimiter', '\n');
 C = [C{1,1}];
 c=0;
 % the HbO, HbR and HbT information
@@ -93,5 +93,6 @@ d = foo;
 fs = 1/(t(2)-t(1));
 raw_dc = dc;
 % saving data in .nirs format
-save([pathName,filesep,prevName '.nirs'] ,'d','aux','s','t','tIncMan','SD','fs','procResult','mark','raw_dc');
+save(strcat(pathName, filesep, prevName, ".nirs"), 'd', 'aux', 's', 't', 'tIncMan', 'SD', 'fs', ...
+    'procResult', 'mark', 'raw_dc');
 
