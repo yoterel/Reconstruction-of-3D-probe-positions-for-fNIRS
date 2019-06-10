@@ -1,4 +1,4 @@
-function [landmarks] = find_landmarks_standalone()
+function [landmarks] = find_landmarks_standalone(file_path)
     %replace with model file location
     model_file=fullfile('68_face_landmarks_model.dat');
     %replace with python script location
@@ -21,6 +21,7 @@ function [landmarks] = find_landmarks_standalone()
     landmarks=strip(landmarks);
     landmarks=landmarks(2:end-1);
     output={};
+    out=[];
     a = regexp(landmarks,'\[{1,2}[\d,]*\]{1,2}','match');
     for i=1:1:length(a)
         if strcmp(a{i},'[]')
