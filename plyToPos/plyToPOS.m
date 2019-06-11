@@ -338,6 +338,9 @@ F{1,1}(1,:) = referencePositionFilePath;
 F{1,1}(2,:) = optodePositionsFilePath;
 F{1,1}(3,:) = channelConfigOutputFilePath;
 F{2,1} = nirsModelPath;
+
+% TODO: thie spm script expects "render_mni_icbm152.mat" to be in the same folder
+% of outer script. We need to change it somehow.
 spm_fnirs_spatialpreproc_ui(F);
     
 close all

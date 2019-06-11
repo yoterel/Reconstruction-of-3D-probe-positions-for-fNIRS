@@ -1,5 +1,4 @@
-addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', ...
-    ['plyToPos', filesep, 'spm_fnirs'])
+addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 
 % TODO: make configurable?
 % Parameters for the run
@@ -65,7 +64,7 @@ for i = fileIndices
     plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
     plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
-    addpath(spmPath, spmFNIRSPath);
+    addpath(spmPath, spmFNIRSPath, fullfile(spmFNIRSPath, "nfri_functions"));
     plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
         nirsModelPath, plyToPOSgroupSize);
     
