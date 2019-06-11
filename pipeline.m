@@ -16,7 +16,8 @@ useVideo = true; % Whether to use a video file directly or already extracted fra
 shimadzuFileName = "infant"; % Name of shimadzu output file in the video directory
 plyToPOSgroupSize = 8; % for modelStars, 20 is used (for capStars it's fine to have outliers)
 outputDirPrefix = "model";
-spmPath = "C:\Users\Dean\Documents\MATLAB\spm12"; % SPM installation path
+spmPath = "C:\Users\Dean\Documents\MATLAB\spm12"; % spm installation path
+spmFNIRSPath = "C:\Users\Dean\Documents\MATLAB\spm_fnirs"; % spm_fnirs installation path
 
 % Inner use consts
 connectionsFileName = "connections.txt";
@@ -64,7 +65,7 @@ for i = fileIndices
     plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
     fprintf("Converting .ply file to .pos file\n");
     plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
-    addpath(spmPath);
+    addpath(spmPath, spmFNIRSPath);
     plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
         nirsModelPath, plyToPOSgroupSize);
     

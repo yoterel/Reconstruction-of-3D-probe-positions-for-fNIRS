@@ -93,7 +93,7 @@ capTripletOrder = nchoosek(1:size(capStars,1),3);
 % capTripletOrder = [4,3,5];
 % modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
 % missingStars = {'Nz';'Iz';'AR';'AL'};
-missingStars = {};
+missingStars = {}; %TODO: how do I get the values for this?
 existStars = modelStars(~ismember(modelLabels,missingStars),:);
 %modelTriplet = modelTriplet - mean(existStars);
 %existStars = existStars - mean(existStars);
@@ -175,12 +175,14 @@ modelLabels = [modelMNI.labels];
 
 % perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
+% TODO: use consts for point labels? + uncomment include code from infant
+% version?
 fprintf("Performing grid search of axis-aligned scaling\n");
 capHeadIdxs = ismember(capLabels,{'Nz','Cz','AR','AL'});
-modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'});
+modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'}); % & ~ismember(modelLabels,missingStars);
 capCapIdxs = ismember(capLabels,{'Front','Cz','Right','Left','Pz','Iz'});
-modelCapIdxs = ismember(modelLabels,{'Front','Cz','Right','Left','Pz','Iz'});
-%%
+modelCapIdxs = ismember(modelLabels,{'Front','Cz','Right','Left','Pz','Iz'}); % & ~ismember(modelLabels,missingStars);
+
 modelHead = modelPoints(modelHeadIdxs,:);
 capHead = capStars(capHeadIdxs,:);
 scalespace = logspace(log10(0.5),log10(2),20);
