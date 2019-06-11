@@ -9,3 +9,12 @@ or here:
 http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 
 The .m file is a matlab wrapper which uses the output of the python script and creates a polygon by reflecting the point of the nose about the line segment created by the eyes.
+
+required python version:
+3.4 and up
+
+required python dependencies:
+numpy
+imutils
+dlib
+cv2
