@@ -2,6 +2,10 @@ function [frameRate] = createInputImages(useVideo, sourceFile, net, imgResultFil
     outputFolder, frameSkip)
 %CREATEINPUTIMAGES Creates a set of input images for mesh reconstruction
 %(usually through VSFM)
+if ~exist(outputFolder, 'dir')
+    mkdir(outputFolder);
+end
+
 frameCounter = 0;
 if (useVideo)
     fprintf("Reading video\n");
@@ -59,4 +63,3 @@ function writeImages(maskedRgbImage, finalImage, frameCounter, outputFolder, img
     outputFullFileName = fullfile(outputFolder, fileName2); 
     imwrite(maskedRgbImage, outputFullFileName, 'jpg'); 
 end
-

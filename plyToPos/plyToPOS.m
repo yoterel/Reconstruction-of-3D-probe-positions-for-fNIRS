@@ -1,25 +1,26 @@
 function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
     nirsModelPath, groupSize)
-trgShade = stickerHSV(1);
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
 manualPoints = [];
 
+%% Get hue of stickers and locate relevant points in the ply
 mesh = plyread(fullPlyFileName);
 fprintf("Finished reading ply file\n");
 vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
 verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
 verColorsHSV = rgb2hsv(double(verColors)/255);
+trgShade = stickerHSV(1);
 idxs = find(abs(verColorsHSV(:,1)-trgShade) < 0.15 & ((verColorsHSV(:,2) > 0.2 & verColorsHSV(:,3) > 0.2) | (verColorsHSV(:,2) > 0.3 & verColorsHSV(:,3) > 0.1)));
 candidates = vertices(idxs,:);
 plot3(vertices(idxs,1),vertices(idxs,2),vertices(idxs,3),'.');
 [capSphereC, capSphereR] = sphereFit(candidates);
 fprintf("Performed sphere fit 1\n");
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
-%load(['model',filesep,'modelMNI.mat']); 
-%load(['FixModelMNI.mat']); 
-load(mniModelPath);
+%load(mniModelPath, 'modelMNI');
+load(mniModelPath, 'infantModelMNI');
+modelMNI = infantModelMNI;
 fprintf("Loaded MNI model\n");
 
 headAndCapIdxs = length(modelMNI.X)-8:length(modelMNI.X);
@@ -29,11 +30,12 @@ modelLabels = modelMNI.labels(headAndCapIdxs);
 fprintf("Performed sphere fit 2\n")
 %modelStars = modelStars*capSphereR/modelSphereR-modelSphereC+capSphereC; % scale and translate model to fit cap
 candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
-%%
+
+%% Divide sticker points into clouds
 % bbox = [max(vertices); min(vertices)];
 % radius = sqrt(sum((bbox(1,:)-bbox(2,:)).^2));
 radius = modelSphereR;
-thr = radius/15;
+thr = radius/15; % TODO: make 15 parameter? Relative distance for which 2 points are considered the same sticker
 distMatrix = zeros(length(candidates));
 adjMatrix = zeros(length(candidates));
 for v = 1:length(candidates)
@@ -41,6 +43,8 @@ for v = 1:length(candidates)
 end
 adjMatrix(distMatrix < thr) = 1;
 [labels, ~] = graphConnectedComponents(adjMatrix);
+
+%% Convert sticker point clouds into positions, calcualte size of each sticker (in points), remove small groups
 figure; axis equal; hold on
 counter = zeros(max(labels),1);
 mids = zeros(max(labels),3);
@@ -56,18 +60,16 @@ end
 % rts = n(rts);
 %%
 %plot3(mids(counter > groupSize,1),mids(counter > groupSize,2),mids(counter > groupSize,3),'p','markersize',25,'MarkerFaceColor','k');
-%%
-% figure; axis equal; hold on
 % X = [mesh.vertex.x,mesh.vertex.y,mesh.vertex.z];
 % X = X - mean(X);
 % plot3(X(:,1),X(:,2),X(:,3),'.');
-capStars = mids(counter > groupSize,:);
+capStars = mids(counter > groupSize,:); % throw away stickers that are too small
 
-%%
-%manually add point!
+%% Add the manually added points
 if ~isempty(manualPoints)
     capStars = [capStars; manualPoints*modelSphereR/capSphereR+modelSphereC-capSphereC];
 end
+
 %%
 %capStars = capStars - mean(capStars);% implicit expansion
 plot3(capStars(:,1),capStars(:,2),capStars(:,3),'p','markersize',25,'MarkerFaceColor','k');
@@ -84,7 +86,8 @@ plot3(capStars(:,1),capStars(:,2),capStars(:,3),'p','markersize',25,'MarkerFaceC
 % scatter3(sphereCoords(:,1),sphereCoords(:,2),sphereCoords(:,3))
 % scatter3(vertices(:,1),vertices(:,2),vertices(:,3),1)
 % save([plyPath,'modelStars.mat'],'modelStars','modelLabels','modelSphereC','modelSphereR')
-%%
+
+%% Pick sticker + model point triplets, try to find best match, get bestRegParams
 % capFront = capStars(4,:);
 % capLeft = capStars(3,:);
 % capRight = capStars(5,:);
@@ -93,12 +96,11 @@ capTripletOrder = nchoosek(1:size(capStars,1),3);
 % capTripletOrder = [4,3,5];
 % modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
 % missingStars = {'Nz';'Iz';'AR';'AL'};
-missingStars = {}; %TODO: how do I get the values for this?
+missingStars = {'Iz'}; %TODO: this should be marked by user. We have to validate we have 9 points overall
 existStars = modelStars(~ismember(modelLabels,missingStars),:);
 %modelTriplet = modelTriplet - mean(existStars);
 %existStars = existStars - mean(existStars);
 existLabels = modelLabels(~ismember(modelLabels,missingStars));
-%%
 modelTripletOrder = nchoosek(1:size(existStars,1),3);
 w = 0.7;
 bestD = inf;
@@ -148,7 +150,8 @@ for ii = 1:size(modelTripletOrder,1)
         end
     end
 end
-%%
+
+%% Use bestRegParams and bestProjStars to adjust the model
 [idx,d] = knnsearch(bestProjStars, capStars);
 fprintf("Performed knn search 1\n");
 %capStarsEnum = 1:size(capStars,1);
@@ -173,15 +176,15 @@ capStars = capStars(:,1:3);
 modelPoints = [modelMNI.X,modelMNI.Y,modelMNI.Z]; 
 modelLabels = [modelMNI.labels];
 
-% perform grid search of axis-aligned scaling, and realign at each step.
+%% perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
-% TODO: use consts for point labels? + uncomment include code from infant
-% version?
+% TODO: use consts for point labels?
 fprintf("Performing grid search of axis-aligned scaling\n");
 capHeadIdxs = ismember(capLabels,{'Nz','Cz','AR','AL'});
-modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'}); % & ~ismember(modelLabels,missingStars);
+modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'}) & ~ismember(modelLabels, missingStars);
 capCapIdxs = ismember(capLabels,{'Front','Cz','Right','Left','Pz','Iz'});
-modelCapIdxs = ismember(modelLabels,{'Front','Cz','Right','Left','Pz','Iz'}); % & ~ismember(modelLabels,missingStars);
+modelCapIdxs = ismember(modelLabels,{'Front','Cz','Right','Left','Pz','Iz'})& ...
+    ~ismember(modelLabels,missingStars);
 
 modelHead = modelPoints(modelHeadIdxs,:);
 capHead = capStars(capHeadIdxs,:);
@@ -191,7 +194,7 @@ for scX = scalespace
     for scY = scalespace
         for scZ = scalespace
             testStars = capHead.*[scX,scY,scZ]; % implicit expansion
-            testReg = absor(testStars',modelHead');
+            testReg = absor(testStars', modelHead');
             testStars = [testStars ones(size(testStars,1),1)]*testReg.M';
             testStars = testStars(:,1:3);
             %%%% maybe not needed, need to use the labels
@@ -230,7 +233,8 @@ capCap = scaledCap(capCapIdxs,:);
 [modelReg, movedModel] = absor(modelCap',capCap');
 modelOnCapCap = [modelPoints ones(size(modelPoints,1),1)]*modelReg.M';
 modelOnCapCap(:,4) = [];
-%%
+
+%% Graph results
 figure; hold on; axis equal; scatter3(modelHead(:,1),modelHead(:,2),modelHead(:,3));
 scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
 scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))

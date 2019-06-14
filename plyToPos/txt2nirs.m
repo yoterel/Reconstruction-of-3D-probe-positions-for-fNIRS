@@ -83,5 +83,5 @@ Y.hbo = data(1:min(endFile,size(data,1)),5:3:end);
 Y.hbr = data(1:min(endFile,size(data,1)),6:3:end);
 Y.hbt = data(1:min(endFile,size(data,1)),7:3:end);
 
-save(P.fname.nirs,'P','Y')
+save(P.fname.nirs, 'P', 'Y')
     
