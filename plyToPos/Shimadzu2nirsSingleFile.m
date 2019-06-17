@@ -8,9 +8,9 @@
 % Refer to Aasted et al., Neurophotonics, 2014 for a tutorial.
 
 %% INPUT:
-% User needs to have the following files in the current matlab directory:
-% Shimadzu data: the acceptable format is .txt
-% SD file: the SD structure with .SD format
+% shimadzuFilePath: the acceptable format is .txt
+% sdFilePath: the SD structure with .SD format
+% outputFilePath: path of output .nirs file
 
 %% OUTPUT:
 % filename.nirs: contains d, aux, s, t, tIncMan,SD
@@ -25,15 +25,11 @@
 %        Vector same length as d. (#time points).
 
 % LOG:
-% created 04-14-2017, Created by Sahar Jahani
-
-% TO DO:
-%
-function Shimadzu2nirsSingleFile(filename)
-[pathName,prevName] = fileparts(filename);
-fid = fopen(filename);
-filelist = dir(strcat(pathName, filesep, "*.SD"));
-load(strcat(pathName, filesep, filelist.name), '-mat'); % loading SD file
+% Created 04-14-2017, Created by Sahar Jahani
+% Edited  06-17-2019, by Dean
+function Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, outputFilePath)
+fid = fopen(shimadzuFilePath);
+load(sdFilePath, '-mat'); % loading SD file
 C = textscan(fid, '%s', 'delimiter', '\n');
 C = [C{1,1}];
 c=0;
@@ -93,6 +89,5 @@ d = foo;
 fs = 1/(t(2)-t(1));
 raw_dc = dc;
 % saving data in .nirs format
-save(strcat(pathName, filesep, prevName, ".nirs"), 'd', 'aux', 's', 't', 'tIncMan', 'SD', 'fs', ...
-    'procResult', 'mark', 'raw_dc');
+save(outputFilePath, 'd', 'aux', 's', 't', 'tIncMan', 'SD', 'fs', 'procResult', 'mark', 'raw_dc');
 

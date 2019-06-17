@@ -1,5 +1,5 @@
 function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
-    nirsModelPath, groupSize)
+    nirsModelPath, stickerGroupSize, radiusToStickerRatio)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
@@ -18,9 +18,9 @@ plot3(vertices(idxs,1),vertices(idxs,2),vertices(idxs,3),'.');
 [capSphereC, capSphereR] = sphereFit(candidates);
 fprintf("Performed sphere fit 1\n");
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
-%load(mniModelPath, 'modelMNI');
-load(mniModelPath, 'infantModelMNI');
-modelMNI = infantModelMNI;
+load(mniModelPath, 'modelMNI');
+%load(mniModelPath, 'infantModelMNI');
+%modelMNI = infantModelMNI;
 fprintf("Loaded MNI model\n");
 
 headAndCapIdxs = length(modelMNI.X)-8:length(modelMNI.X);
@@ -35,7 +35,7 @@ candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 % bbox = [max(vertices); min(vertices)];
 % radius = sqrt(sum((bbox(1,:)-bbox(2,:)).^2));
 radius = modelSphereR;
-thr = radius/15; % TODO: make 15 parameter? Relative distance for which 2 points are considered the same sticker
+thr = radius / radiusToStickerRatio;
 distMatrix = zeros(length(candidates));
 adjMatrix = zeros(length(candidates));
 for v = 1:length(candidates)
@@ -63,7 +63,7 @@ end
 % X = [mesh.vertex.x,mesh.vertex.y,mesh.vertex.z];
 % X = X - mean(X);
 % plot3(X(:,1),X(:,2),X(:,3),'.');
-capStars = mids(counter > groupSize,:); % throw away stickers that are too small
+capStars = mids(counter > stickerGroupSize,:); % throw away stickers that are too small
 
 %% Add the manually added points
 if ~isempty(manualPoints)
@@ -96,7 +96,7 @@ capTripletOrder = nchoosek(1:size(capStars,1),3);
 % capTripletOrder = [4,3,5];
 % modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
 % missingStars = {'Nz';'Iz';'AR';'AL'};
-missingStars = {'Iz'}; %TODO: this should be marked by user. We have to validate we have 9 points overall
+missingStars = {}; %TODO: this should be marked by user. We have to validate we have 9 points overall
 existStars = modelStars(~ismember(modelLabels,missingStars),:);
 %modelTriplet = modelTriplet - mean(existStars);
 %existStars = existStars - mean(existStars);
@@ -136,14 +136,34 @@ for ii = 1:size(modelTripletOrder,1)
 %                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
 %             end
             %[match, cost] = munkres(dists);
-            [idx,d] = knnsearch(modelProjStars,capStars);
+            mm = 1;
+            edges = [];
+            for nn = 1:size(capStars,1)
+                for pp = 1:size(modelProjStars,1)
+                    d = norm(capStars(nn,:) - modelProjStars(pp,:));
+                    if ( d < modelSphereR)
+                        edges(mm,1) = nn+size(modelProjStars,1);
+                        edges(mm,2) = pp;
+                        edges(mm,3) = d*d;
+                        mm = mm + 1;
+                    end
+                end
+            end
+            edges(:,3) = max(edges(:,3)) - edges(:,3) + 1;
+            mate = maxWeightMatching(edges,false);
+            mate = mate(size(modelProjStars,1)+1:end);
+            if any(mate < 0) || length(mate) < size(capStars,1)
+                d = inf;
+            else
+                d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
+            end
+
             %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
             %if ( cost < bestD )
             if sum(d) < bestD
                 %bestD = cost;
                 bestD = sum(d);
-                %bestLabels = existLabels(match);
-                bestLabels = existLabels(idx);
+                %bestLabels = existLabels(idx);
                 bestProjStars = modelProjStars;
                 bestRegParams = regParams;
             end
@@ -152,14 +172,25 @@ for ii = 1:size(modelTripletOrder,1)
 end
 
 %% Use bestRegParams and bestProjStars to adjust the model
-[idx,d] = knnsearch(bestProjStars, capStars);
-fprintf("Performed knn search 1\n");
-%capStarsEnum = 1:size(capStars,1);
-[B, I] = sort(d);
-[C,IA] = unique(idx(I));
-capLabels = existLabels(idx);
-capLabels = capLabels(I(IA));
-capStars = capStars(I(IA),:);
+fprintf("Applying the calculated regulation parameters\n");
+kk = 1;
+for ii = 1:size(capStars,1)
+    for jj = 1:size(bestProjStars,1)
+        d = norm(capStars(ii,:) - bestProjStars(jj,:));
+        if ( d < modelSphereR)
+            edges(kk,1) = ii+size(bestProjStars,1);
+            edges(kk,2) = jj;
+            edges(kk,3) = d*d;
+            kk = kk + 1;
+        end
+    end
+end
+edges(:,3) = max(edges(:,3)) - edges(:,3) + 1;
+mate = maxWeightMatching(edges,false);
+mate = mate(size(bestProjStars,1)+1:end);
+capStars(mate < 1,:) = [];
+mate(mate < 1) = [];
+capLabels = existLabels(mate);
 
 %capLabels = existLabels((idx(I(IA))));
 figure;
@@ -170,11 +201,17 @@ plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
 text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
 
 % rotate model to MNI. Use this rotation for the cap
-capStarsOrigCoords = capStars;
 capStars = [capStars ones(length(capStars),1)]*(bestRegParams.M^-1)';
 capStars = capStars(:,1:3);
 modelPoints = [modelMNI.X,modelMNI.Y,modelMNI.Z]; 
 modelLabels = [modelMNI.labels];
+
+% reorder capStars and capLabels according to modelLabels
+tempCapStars = capStars;
+for ii = 1:length(existLabels)
+    capStars(ii,:) = tempCapStars(strcmp(capLabels,existLabels{ii}),:);
+end
+capLabels = existLabels;
 
 %% perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
@@ -193,6 +230,7 @@ bestD = inf;
 for scX = scalespace
     for scY = scalespace
         for scZ = scalespace
+            
             testStars = capHead.*[scX,scY,scZ]; % implicit expansion
             testReg = absor(testStars', modelHead');
             testStars = [testStars ones(size(testStars,1),1)]*testReg.M';
@@ -286,8 +324,10 @@ fclose(fid);
 SD.MeasList = [repmat([Source,Detector],3,1),ones(nChannels*3,1),[ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
 SD.MeasListAct = ones(size(SD.MeasList,1),1);
 SD.SpatialUnit = 'mm';
-save(fullfile(outputDir, "SD.SD"), 'SD', '-mat')
-Shimadzu2nirsSingleFile(shimadzuFilePath);
+sdFilePath = fullfile(outputDir, "SD.SD");
+save(sdFilePath, 'SD', '-mat')
+nirsFilePath = fullfile(outputDir, "output.nirs"); % TODO: use
+Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, nirsFilePath);
 txt2nirs(shimadzuFilePath);
 
 %% export optode position
