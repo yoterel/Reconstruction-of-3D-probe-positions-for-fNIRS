@@ -1,5 +1,5 @@
 function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
-    nirsModelPath, stickerGroupSize, radiusToStickerRatio)
+    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio)
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
@@ -63,7 +63,8 @@ end
 % X = [mesh.vertex.x,mesh.vertex.y,mesh.vertex.z];
 % X = X - mean(X);
 % plot3(X(:,1),X(:,2),X(:,3),'.');
-capStars = mids(counter > stickerGroupSize,:); % throw away stickers that are too small
+% Throw away stickers that are too small
+capStars = mids(counter > stickerMinGroupSize,:); 
 
 %% Add the manually added points
 if ~isempty(manualPoints)
@@ -96,7 +97,7 @@ capTripletOrder = nchoosek(1:size(capStars,1),3);
 % capTripletOrder = [4,3,5];
 % modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
 % missingStars = {'Nz';'Iz';'AR';'AL'};
-missingStars = {}; %TODO: this should be marked by user. We have to validate we have 9 points overall
+missingStars = {}; % TODO: this should be marked by user. We have to validate we have 9 points overall
 existStars = modelStars(~ismember(modelLabels,missingStars),:);
 %modelTriplet = modelTriplet - mean(existStars);
 %existStars = existStars - mean(existStars);
@@ -136,22 +137,7 @@ for ii = 1:size(modelTripletOrder,1)
 %                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
 %             end
             %[match, cost] = munkres(dists);
-            mm = 1;
-            edges = [];
-            for nn = 1:size(capStars,1)
-                for pp = 1:size(modelProjStars,1)
-                    d = norm(capStars(nn,:) - modelProjStars(pp,:));
-                    if ( d < modelSphereR)
-                        edges(mm,1) = nn+size(modelProjStars,1);
-                        edges(mm,2) = pp;
-                        edges(mm,3) = d*d;
-                        mm = mm + 1;
-                    end
-                end
-            end
-            edges(:,3) = max(edges(:,3)) - edges(:,3) + 1;
-            mate = maxWeightMatching(edges,false);
-            mate = mate(size(modelProjStars,1)+1:end);
+            mate = maxWeightMatchingHelper(capStars, modelProjStars, modelSphereR);
             if any(mate < 0) || length(mate) < size(capStars,1)
                 d = inf;
             else
@@ -173,21 +159,7 @@ end
 
 %% Use bestRegParams and bestProjStars to adjust the model
 fprintf("Applying the calculated regulation parameters\n");
-kk = 1;
-for ii = 1:size(capStars,1)
-    for jj = 1:size(bestProjStars,1)
-        d = norm(capStars(ii,:) - bestProjStars(jj,:));
-        if ( d < modelSphereR)
-            edges(kk,1) = ii+size(bestProjStars,1);
-            edges(kk,2) = jj;
-            edges(kk,3) = d*d;
-            kk = kk + 1;
-        end
-    end
-end
-edges(:,3) = max(edges(:,3)) - edges(:,3) + 1;
-mate = maxWeightMatching(edges,false);
-mate = mate(size(bestProjStars,1)+1:end);
+mate = maxWeightMatchingHelper(capStars, bestProjStars, modelSphereR);
 capStars(mate < 1,:) = [];
 mate(mate < 1) = [];
 capLabels = existLabels(mate);
@@ -326,8 +298,8 @@ SD.MeasListAct = ones(size(SD.MeasList,1),1);
 SD.SpatialUnit = 'mm';
 sdFilePath = fullfile(outputDir, "SD.SD");
 save(sdFilePath, 'SD', '-mat')
-nirsFilePath = fullfile(outputDir, "output.nirs"); % TODO: use
-Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, nirsFilePath);
+nirsOutputFilePath = fullfile(outputDir, "nirs_model.nirs");
+Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, nirsOutputFilePath);
 txt2nirs(shimadzuFilePath);
 
 %% export optode position
@@ -382,9 +354,6 @@ F{1,1}(1,:) = referencePositionFilePath;
 F{1,1}(2,:) = optodePositionsFilePath;
 F{1,1}(3,:) = channelConfigOutputFilePath;
 F{2,1} = nirsModelPath;
-
-% TODO: thie spm script expects "render_mni_icbm152.mat" to be in the same folder
-% of outer script. We need to change it somehow.
 spm_fnirs_spatialpreproc_ui(F);
     
 close all
