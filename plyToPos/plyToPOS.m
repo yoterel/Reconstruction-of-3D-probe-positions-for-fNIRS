@@ -1,34 +1,41 @@
-function [] = plyToPOS(fullPlyFileName, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
+function [] = plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, outputDir, ...
     nirsModelPath, stickerMinGroupSize, radiusToStickerRatio)
+% PLYTOPOS converts a ply file to a POS
+%            plyFilePath: Path to the ply file to convert
+%             stickerHSV: A normalized (between 0 and 1) 1ª3 hsv representation of the
+%                         stickers' color
+%           mniModelPath: Path of a file containing info on the model of the cap itself
+%                         (labels and 3d positions of points)
+%       shimadzuFilePath: Path of the shimadzu output file
+%              outputDir: The output dir for the current script
+%          nirsModelPath: 
+%    stickerMinGroupSize: Minimum number of points in a group for it to be
+%                         considered a separate sticker.
+%   radiusToStickerRatio: Relative distance for which 2 points are considered the same sticker
+
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
 manualPoints = [];
-
-%% Get hue of stickers and locate relevant points in the ply
-mesh = plyread(fullPlyFileName);
+mesh = plyread(plyFilePath);
 fprintf("Finished reading ply file\n");
+
 vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
-verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
-verColorsHSV = rgb2hsv(double(verColors)/255);
-trgShade = stickerHSV(1);
-idxs = find(abs(verColorsHSV(:,1)-trgShade) < 0.15 & ((verColorsHSV(:,2) > 0.2 & verColorsHSV(:,3) > 0.2) | (verColorsHSV(:,2) > 0.3 & verColorsHSV(:,3) > 0.1)));
-candidates = vertices(idxs,:);
-plot3(vertices(idxs,1),vertices(idxs,2),vertices(idxs,3),'.');
+candidates = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV);
+
 [capSphereC, capSphereR] = sphereFit(candidates);
-fprintf("Performed sphere fit 1\n");
+fprintf("Performed sphere fit on candidates 1\n");
+
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
 load(mniModelPath, 'modelMNI');
 %load(mniModelPath, 'infantModelMNI');
 %modelMNI = infantModelMNI;
 fprintf("Loaded MNI model\n");
 
-headAndCapIdxs = length(modelMNI.X)-8:length(modelMNI.X);
-modelStars = [modelMNI.X(headAndCapIdxs),modelMNI.Y(headAndCapIdxs),modelMNI.Z(headAndCapIdxs)]; 
-modelLabels = modelMNI.labels(headAndCapIdxs);
-[modelSphereC,modelSphereR] = sphereFit([modelMNI.X,modelMNI.Y,modelMNI.Z]);
-fprintf("Performed sphere fit 2\n")
-%modelStars = modelStars*capSphereR/modelSphereR-modelSphereC+capSphereC; % scale and translate model to fit cap
+% Find an approximating sphere for the model, use it to scale and translate the sticker candidate 
+% vertices on the cap (one can also scale modelStars instead, as was done before in a comment)
+[modelSphereC, modelSphereR] = sphereFit([modelMNI.X,modelMNI.Y,modelMNI.Z]);
+fprintf("Performed sphere fit on model mni\n")
 candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 
 %% Divide sticker points into clouds
@@ -89,6 +96,11 @@ plot3(capStars(:,1),capStars(:,2),capStars(:,3),'p','markersize',25,'MarkerFaceC
 % save([plyPath,'modelStars.mat'],'modelStars','modelLabels','modelSphereC','modelSphereR')
 
 %% Pick sticker + model point triplets, try to find best match, get bestRegParams
+% The last 9 points in the model MNI are the relevant ones (TODO: be more
+% precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
+headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
+modelStars = modelMNI(headAndCapIdxs, 2:4);
+modelLabels = modelMNI.labels(headAndCapIdxs);
 % capFront = capStars(4,:);
 % capLeft = capStars(3,:);
 % capRight = capStars(5,:);
@@ -357,3 +369,17 @@ F{2,1} = nirsModelPath;
 spm_fnirs_spatialpreproc_ui(F);
     
 close all
+end
+
+function [candidates] = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV)
+% getAndPlotStickerCandidatePoints Find coordinates of points in the ply whose hue is close to the
+%   given stickers' hue
+verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
+verColorsHSV = rgb2hsv(double(verColors)/255);
+trgHue = stickerHSV(1);
+candidates = vertices(abs(verColorsHSV(:,1)-trgHue) < 0.15 & ... 
+    ((verColorsHSV(:,2) > 0.2 & verColorsHSV(:,3) > 0.2) | (verColorsHSV(:,2) > 0.3 & verColorsHSV(:,3) > 0.1)), :);
+fprintf("Found sticker candidate vertices\n");
+% Plot the candidates
+plot3(candidates(:,1), candidates(:,2), candidates(:,3), '.');
+end
