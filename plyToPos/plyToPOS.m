@@ -37,6 +37,12 @@ candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize);
 
+% The last 9 points in the model MNI are the relevant ones (TODO: be more
+% precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
+headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
+modelStars = table2array(modelMNI(headAndCapIdxs, 2:4));
+modelStarLabels = modelMNI.labels(headAndCapIdxs);
+
 %% Add the manually added points
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
 %manualPoints = [-4.561 0.562 3.81]; %subject 2
@@ -46,8 +52,9 @@ if ~isempty(manualPoints)
     capStars = [capStars; manualPoints*modelSphereR/capSphereR+modelSphereC-capSphereC];
 end
 
+% TODO: this is probably figure 2. Add description.
 %capStars = capStars - mean(capStars);% implicit expansion
-plot3(capStars(:,1),capStars(:,2),capStars(:,3), 'p', 'markersize', 25, 'MarkerFaceColor', 'k');
+plot3(capStars(:,1), capStars(:,2), capStars(:,3), 'p', 'markersize', 25, 'MarkerFaceColor', 'k');
 
 %% save for model. Order of labels change from run to run.
 % close all
@@ -64,104 +71,45 @@ plot3(capStars(:,1),capStars(:,2),capStars(:,3), 'p', 'markersize', 25, 'MarkerF
 % save([plyPath,'modelStars.mat'],'modelStars','modelLabels','modelSphereC','modelSphereR')
 
 %% Pick sticker + model point triplets, try to find best match, get bestRegParams
-% The last 9 points in the model MNI are the relevant ones (TODO: be more
-% precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
-headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
-modelStars = modelMNI(headAndCapIdxs, 2:4);
-modelLabels = modelMNI.labels(headAndCapIdxs);
-% capFront = capStars(4,:);
-% capLeft = capStars(3,:);
-% capRight = capStars(5,:);
-% testCapTriplet = [capFront;capRight;capLeft];
-capTripletOrder = nchoosek(1:size(capStars,1),3);
-% capTripletOrder = [4,3,5];
-% modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
+% TODO: why are we using missing stars? Aren't they supplied by the user?
 % missingStars = {'Nz';'Iz';'AR';'AL'};
-missingStars = {}; % TODO: this should be marked by user. We have to validate we have 9 points overall
-existStars = modelStars(~ismember(modelLabels,missingStars),:);
+missingStars = {}; % TODO: how do we use this? With manual points? Are these missing stars on the model?
+
+% modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
+
+existStarsBitVec = ~ismember(modelStarLabels, missingStars);
+existStars = modelStars(existStarsBitVec, :);
 %modelTriplet = modelTriplet - mean(existStars);
 %existStars = existStars - mean(existStars);
-existLabels = modelLabels(~ismember(modelLabels,missingStars));
-modelTripletOrder = nchoosek(1:size(existStars,1),3);
-w = 0.7;
-bestD = inf;
-outlierThr = capSphereR;
-fprintf("Processing triplets\n");
-% TODO: maybe there's a way to accelerate this part? Use all cores?
-for ii = 1:size(modelTripletOrder,1)
-    fprintf("Triplet number %d\n", ii);
-    modelTriplet = existStars(modelTripletOrder(ii,:),:);
-%     tModelStars = zeros(size(existStars));
-%     for jj = 1:size(existStars,1)
-%         A = [modelTriplet w*eye(3)];
-% %         %tModelStars(jj,:) = existStars(jj,:)/modelTriplet;
-% tModelStars(jj,:) = A'\[existStars(jj,:) zeros(1,3)]';
-% %         tModelStars(jj,:) = [existStars(jj,:) zeros(1,3)]*A'*(A*A')^-1;
-%     end
-    
-    for kk = 1:size(capTripletOrder,1)
-        currTriplet = capTripletOrder(kk,:);
-        permTriplet = perms(currTriplet);
-        for ll = 1:size(permTriplet,1)
-            capTriplet = capStars(permTriplet(ll,:),:);
-            regParams = absor(modelTriplet',capTriplet');
-            %tform = fitgeotrans(modelTriplet,capTriplet,'nonreflective similarity');
-            modelProjStars = [existStars ones(size(existStars,1),1)]*regParams.M';
-            modelProjStars = modelProjStars(:,1:3);
-            %             modelProjStars = zeros(size(existStars));
-            %             for mm = 1:size(existStars,1)
-            %                 modelProjStars(mm,:) = tModelStars(mm,:)*capTriplet;
-            %             end
-%             dists = ones(size(existStars,1),size(modelStars,1));
-%             for dd = 1:size(existStars,1)
-%                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
-%             end
-            %[match, cost] = munkres(dists);
-            mate = maxWeightMatchingHelper(capStars, modelProjStars, modelSphereR);
-            if any(mate < 0) || length(mate) < size(capStars,1)
-                d = inf;
-            else
-                d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
-            end
+existLabels = modelStarLabels(existStarsBitVec);
 
-            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
-            %if ( cost < bestD )
-            if sum(d) < bestD
-                %bestD = cost;
-                bestD = sum(d);
-                %bestLabels = existLabels(idx);
-                bestProjStars = modelProjStars;
-                bestRegParams = regParams;
-            end
-        end
-    end
-end
+[bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, ...
+    modelSphereR);
 
-%% Use bestRegParams and bestProjStars to adjust the model
+% Use bestProjStars to label the cap stars
 fprintf("Applying the calculated regulation parameters\n");
 mate = maxWeightMatchingHelper(capStars, bestProjStars, modelSphereR);
 capStars(mate < 1,:) = [];
 mate(mate < 1) = [];
 capLabels = existLabels(mate);
 
-%capLabels = existLabels((idx(I(IA))));
-figure;
-hold on;axis equal;
+% Plot the cap labels (blue circles) vs. adjusted model stars (red stars) 
+figure; hold on; axis equal;
 plot3(capStars(:,1),capStars(:,2),capStars(:,3),'ob')
 text(capStars(:,1),capStars(:,2),capStars(:,3),capLabels,'color',[0,0,1])
 plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
 text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
 
 % rotate model to MNI. Use this rotation for the cap
-capStars = [capStars ones(length(capStars),1)]*(bestRegParams.M^-1)';
+capStars = [capStars ones(length(capStars), 1)] * (bestRegParams.M^-1)';
 capStars = capStars(:,1:3);
-modelPoints = [modelMNI.X,modelMNI.Y,modelMNI.Z]; 
+modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
 modelLabels = [modelMNI.labels];
 
 % reorder capStars and capLabels according to modelLabels
 tempCapStars = capStars;
 for ii = 1:length(existLabels)
-    capStars(ii,:) = tempCapStars(strcmp(capLabels,existLabels{ii}),:);
+    capStars(ii,:) = tempCapStars(strcmp(capLabels, existLabels{ii}), :);
 end
 capLabels = existLabels;
 
@@ -169,38 +117,16 @@ capLabels = existLabels;
 % USING ONLY THE HEAD POINTS
 % TODO: use consts for point labels?
 fprintf("Performing grid search of axis-aligned scaling\n");
-capHeadIdxs = ismember(capLabels,{'Nz','Cz','AR','AL'});
-modelHeadIdxs = ismember(modelLabels,{'Nz','Cz','AR','AL'}) & ~ismember(modelLabels, missingStars);
-capCapIdxs = ismember(capLabels,{'Front','Cz','Right','Left','Pz','Iz'});
-modelCapIdxs = ismember(modelLabels,{'Front','Cz','Right','Left','Pz','Iz'})& ...
-    ~ismember(modelLabels,missingStars);
+headLabelNames = {'Nz', 'Cz', 'AR', 'AL'};
+capHeadIdxs = ismember(capLabels, headLabelNames);
+existPointsBitVec = ~ismember(modelLabels, missingStars);
+modelHeadIdxs = ismember(modelLabels, headLabelNames) & existPointsBitVec;
+capLabelNames = {'Front', 'Cz', 'Right', 'Left', 'Pz', 'Iz'};
+capCapIdxs = ismember(capLabels, capLabelNames);
+modelCapIdxs = ismember(modelLabels, capLabelNames) & existPointsBitVec;
 
 modelHead = modelPoints(modelHeadIdxs,:);
-capHead = capStars(capHeadIdxs,:);
-scalespace = logspace(log10(0.5),log10(2),20);
-bestD = inf;
-for scX = scalespace
-    for scY = scalespace
-        for scZ = scalespace
-            
-            testStars = capHead.*[scX,scY,scZ]; % implicit expansion
-            testReg = absor(testStars', modelHead');
-            testStars = [testStars ones(size(testStars,1),1)]*testReg.M';
-            testStars = testStars(:,1:3);
-            %%%% maybe not needed, need to use the labels
-            [idx,d] = knnsearch(modelHead,testStars); 
-            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
-            %if ( cost < bestD )
-            cost = sqrt(sum(d.^2));
-            if cost < bestD
-                bestReg = testReg;
-                bestCapHead = testStars;
-                bestScale = [scX,scY,scZ];
-                bestD = cost;
-            end
-        end
-    end
-end
+[bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead);
 
 % rotate + scale model to the best aligned result.
 fprintf("Perfroming rotations & scaling\n");
@@ -220,12 +146,15 @@ for ii = 1:size(modelCapLabels,1)
 end
 modelCap(modelStarsToErase,:) = [];
 capCap = scaledCap(capCapIdxs,:);
-[modelReg, movedModel] = absor(modelCap',capCap');
+[modelReg, ~] = absor(modelCap',capCap');
 modelOnCapCap = [modelPoints ones(size(modelPoints,1),1)]*modelReg.M';
 modelOnCapCap(:,4) = [];
 
 %% Graph results
-figure; hold on; axis equal; scatter3(modelHead(:,1),modelHead(:,2),modelHead(:,3));
+% TODO: this is the graph that looks like a point cloud of the entire head.
+% Figure out what it means exactly.
+figure; hold on; axis equal; 
+scatter3(modelHead(:,1),modelHead(:,2),modelHead(:,3));
 scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
 scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
 scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
@@ -393,4 +322,102 @@ for i = 1:numConnectedComponents
 end
 % Throw away stickers that are too small
 capStars = mids(counter > stickerMinGroupSize,:); 
+end
+
+function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, ...
+    modelSphereR)
+% CALCULATEBESTREGPARAMS Calculates the optimal reg params for adjusting
+%   existing model stars to the cap stars. Returns the parameters and the
+%   adjusted model stars
+
+% capFront = capStars(4,:);
+% capLeft = capStars(3,:);
+% capRight = capStars(5,:);
+% testCapTriplet = [capFront;capRight;capLeft];
+
+capTripletOrder = nchoosek(1:size(capStars,1),3);
+% capTripletOrder = [4,3,5];
+
+modelTripletOrder = nchoosek(1:size(existStars,1),3);
+bestD = inf;
+fprintf("Processing triplets\n");
+% TODO: maybe there's a way to accelerate this part? Use all cores?
+for ii = 1:size(modelTripletOrder,1)
+    fprintf("Triplet number %d\n", ii);
+    modelTriplet = existStars(modelTripletOrder(ii,:),:);
+%     tModelStars = zeros(size(existStars));
+%     for jj = 1:size(existStars,1)
+%         A = [modelTriplet w*eye(3)];
+% %         %tModelStars(jj,:) = existStars(jj,:)/modelTriplet;
+% tModelStars(jj,:) = A'\[existStars(jj,:) zeros(1,3)]';
+% %         tModelStars(jj,:) = [existStars(jj,:) zeros(1,3)]*A'*(A*A')^-1;
+%     end
+    
+    for kk = 1:size(capTripletOrder,1)
+        currTriplet = capTripletOrder(kk,:);
+        permTriplet = perms(currTriplet);
+        for ll = 1:size(permTriplet,1)
+            capTriplet = capStars(permTriplet(ll,:),:);
+            regParams = absor(modelTriplet',capTriplet');
+            %tform = fitgeotrans(modelTriplet,capTriplet,'nonreflective similarity');
+            modelProjStars = [existStars ones(size(existStars,1),1)]*regParams.M';
+            modelProjStars = modelProjStars(:,1:3);
+            %             modelProjStars = zeros(size(existStars));
+            %             for mm = 1:size(existStars,1)
+            %                 modelProjStars(mm,:) = tModelStars(mm,:)*capTriplet;
+            %             end
+%             dists = ones(size(existStars,1),size(modelStars,1));
+%             for dd = 1:size(existStars,1)
+%                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
+%             end
+            %[match, cost] = munkres(dists);
+            mate = maxWeightMatchingHelper(capStars, modelProjStars, modelSphereR);
+            if any(mate < 0) || length(mate) < size(capStars,1)
+                d = inf;
+            else
+                d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
+            end
+
+            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
+            %if ( cost < bestD )
+            if sum(d) < bestD
+                %bestD = cost;
+                bestD = sum(d);
+                %bestLabels = existLabels(idx);
+                bestProjStars = modelProjStars;
+                bestRegParams = regParams;
+            end
+        end
+    end
+end
+end
+
+function [bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead)
+% FINDOPTIMALSCALING Finds the best scaling parameters for fitting the
+%   current cap stars to the model head
+fprintf("Finding optimal scaling parameters\n");
+capHead = capStars(capHeadIdxs,:);
+scalespace = logspace(log10(0.5),log10(2),20);
+bestD = inf;
+for scX = scalespace
+    for scY = scalespace
+        for scZ = scalespace
+            testStars = capHead.*[scX,scY,scZ]; % implicit expansion
+            testReg = absor(testStars', modelHead');
+            testStars = [testStars ones(size(testStars,1),1)]*testReg.M';
+            testStars = testStars(:,1:3);
+            %%%% maybe not needed, need to use the labels
+            [~,d] = knnsearch(modelHead,testStars); 
+            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
+            %if ( cost < bestD )
+            cost = sqrt(sum(d.^2));
+            if cost < bestD
+                bestReg = testReg;
+                bestCapHead = testStars;
+                bestScale = [scX,scY,scZ];
+                bestD = cost;
+            end
+        end
+    end
+end
 end

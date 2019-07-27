@@ -6,11 +6,11 @@ edges = [];
 mm = 1;
 for nn = 1:size(capStars,1)
     for pp = 1:size(projStars, 1)
-        d = norm(capStars(nn,:) - projStars(pp,:));
-        if ( d < modelSphereR)
-            edges(mm,1) = nn+size(projStars, 1);
-            edges(mm,2) = pp;
-            edges(mm,3) = d*d;
+        d = norm(capStars(nn, :) - projStars(pp, :));
+        if (d < modelSphereR)
+            edges(mm, 1) = nn + size(projStars, 1);
+            edges(mm, 2) = pp;
+            edges(mm, 3) = d * d;
             mm = mm + 1;
         end
     end
