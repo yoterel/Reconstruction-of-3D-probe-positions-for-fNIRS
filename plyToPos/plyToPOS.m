@@ -13,8 +13,9 @@ function [] = plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, 
 %                         considered a separate sticker.
 %   radiusToStickerRatio: Relative distance for which 2 points are considered the same sticker
 
+fprintf("Reading ply file\n");
 mesh = plyread(plyFilePath);
-fprintf("Finished reading ply file\n");
+fprintf("Finished reading ply file, finding sticker candidate points\n");
 
 vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
 candidates = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV);
@@ -56,55 +57,18 @@ end
 %capStars = capStars - mean(capStars);% implicit expansion
 plot3(capStars(:,1), capStars(:,2), capStars(:,3), 'p', 'markersize', 25, 'MarkerFaceColor', 'k');
 
-%% save for model. Order of labels change from run to run.
-% close all
-% modelStars = mids(counter > groupSize,:);
-% modelLabels = {'Fz';'Cz';'Nz';'Iz';'Right';'Pz';'AL';'Left';'AR'};
-% [modelSphereC,modelSphereR] = sphereFit(candidates)
-% [x,y,z] = sphere(10);
-% sphereCoords = [x(:),y(:),z(:)];
-% sphereCoords = sphereCoords*modelSphereR+modelSphereC;
-% figure; axis equal; hold on; 
-% plot3(modelStars(:,1),modelStars(:,2),modelStars(:,3),'p','markersize',25,'MarkerFaceColor','k');
-% scatter3(sphereCoords(:,1),sphereCoords(:,2),sphereCoords(:,3))
-% scatter3(vertices(:,1),vertices(:,2),vertices(:,3),1)
-% save([plyPath,'modelStars.mat'],'modelStars','modelLabels','modelSphereC','modelSphereR')
-
 %% Pick sticker + model point triplets, try to find best match, get bestRegParams
 % TODO: why are we using missing stars? Aren't they supplied by the user?
 % missingStars = {'Nz';'Iz';'AR';'AL'};
 missingStars = {}; % TODO: how do we use this? With manual points? Are these missing stars on the model?
-
-% modelTriplet = [modelStars(strcmpi(modelLabels,'front'),:);modelStars(strcmpi(modelLabels,'right'),:);modelStars(strcmpi(modelLabels,'left'),:)];
-
-existStarsBitVec = ~ismember(modelStarLabels, missingStars);
-existStars = modelStars(existStarsBitVec, :);
-%modelTriplet = modelTriplet - mean(existStars);
-%existStars = existStars - mean(existStars);
-existLabels = modelStarLabels(existStarsBitVec);
-
-[bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, ...
-    modelSphereR);
-
-% Use bestProjStars to label the cap stars
-fprintf("Applying the calculated regulation parameters\n");
-mate = maxWeightMatchingHelper(capStars, bestProjStars, modelSphereR);
-capStars(mate < 1,:) = [];
-mate(mate < 1) = [];
-capLabels = existLabels(mate);
-
-% Plot the cap labels (blue circles) vs. adjusted model stars (red stars) 
-figure; hold on; axis equal;
-plot3(capStars(:,1),capStars(:,2),capStars(:,3),'ob')
-text(capStars(:,1),capStars(:,2),capStars(:,3),capLabels,'color',[0,0,1])
-plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
-text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
+[existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, missingStars);
+[bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, modelSphereR);
+[capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels);
+plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels);
 
 % rotate model to MNI. Use this rotation for the cap
 capStars = [capStars ones(length(capStars), 1)] * (bestRegParams.M^-1)';
 capStars = capStars(:,1:3);
-modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
-modelLabels = [modelMNI.labels];
 
 % reorder capStars and capLabels according to modelLabels
 tempCapStars = capStars;
@@ -116,6 +80,8 @@ capLabels = existLabels;
 %% perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
 % TODO: use consts for point labels?
+modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
+modelLabels = [modelMNI.labels];
 fprintf("Performing grid search of axis-aligned scaling\n");
 headLabelNames = {'Nz', 'Cz', 'AR', 'AL'};
 capHeadIdxs = ismember(capLabels, headLabelNames);
@@ -150,15 +116,7 @@ capCap = scaledCap(capCapIdxs,:);
 modelOnCapCap = [modelPoints ones(size(modelPoints,1),1)]*modelReg.M';
 modelOnCapCap(:,4) = [];
 
-%% Graph results
-% TODO: this is the graph that looks like a point cloud of the entire head.
-% Figure out what it means exactly.
-figure; hold on; axis equal; 
-scatter3(modelHead(:,1),modelHead(:,2),modelHead(:,3));
-scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
-scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
-scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
-scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(modelCapIdxs,3))
+graphResults(modelHead, bestCapHead, modelOnCapCap, capCap, modelPoints, modelCapIdxs);
 % use fiber points from resulting model to estimate positions.
 
 %% create files for spm_fnirs and for Homer2
@@ -167,23 +125,23 @@ if ~exist(outputDir, 'dir')
     mkdir(outputDir);
 end
 
-[Ch,Source,Detector] = importChCfgFromShimadzuTXTfile(shimadzuFilePath);
+[Ch, Source, Detector] = importChCfgFromShimadzuTXTfile(shimadzuFilePath);
 nChannels = length(Ch);
-nOptodes = length(unique(Source))+length(unique(Detector));
+nOptodes = length(unique(Source)) + length(unique(Detector));
 subX = modelOnCapCap(:,1);
 subY = modelOnCapCap(:,2);
 subZ = modelOnCapCap(:,3);
 subName = modelMNI.labels;
 
-subX(modelHeadIdxs) = bestCapHead(:,1);
-subY(modelHeadIdxs) = bestCapHead(:,2);
-subZ(modelHeadIdxs) = bestCapHead(:,3);
+subX(modelHeadIdxs) = bestCapHead(:, 1);
+subY(modelHeadIdxs) = bestCapHead(:, 2);
+subZ(modelHeadIdxs) = bestCapHead(:, 3);
 
 refNames = {'nz';'ar';'al';'cz';'iz'};
 fid = fopen(fullfile(outputDir, "digits.txt"), 'w');
 for ref = 1:length(refNames)
-    ind = find(strcmpi(subName,refNames{ref}));
-    fprintf(fid, '%s: %f %f %f\n', refNames{ref},subX(ind),subY(ind),subZ(ind));
+    ind = find(strcmpi(subName, refNames{ref}));
+    fprintf(fid, '%s: %f %f %f\n', refNames{ref}, subX(ind), subY(ind), subZ(ind));
 end
 
 SD.Lambda = [780;805;830];
@@ -202,8 +160,9 @@ for det = 1:SD.nDets
     fprintf(fid, 'd%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
 end
 fclose(fid);
-SD.MeasList = [repmat([Source,Detector],3,1),ones(nChannels*3,1),[ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
-SD.MeasListAct = ones(size(SD.MeasList,1),1);
+SD.MeasList = [repmat([Source,Detector],3,1), ones(nChannels*3,1), ...
+    [ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
+SD.MeasListAct = ones(size(SD.MeasList, 1), 1);
 SD.SpatialUnit = 'mm';
 sdFilePath = fullfile(outputDir, "SD.SD");
 save(sdFilePath, 'SD', '-mat')
@@ -211,65 +170,20 @@ nirsOutputFilePath = fullfile(outputDir, "nirs_model.nirs");
 Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, nirsOutputFilePath);
 txt2nirs(shimadzuFilePath);
 
-%% export optode position
-fprintf("Exporting optode position\n");
-Optode = cell(nOptodes,1);
-X = nan(nOptodes,1);
-Y = nan(nOptodes,1);
-Z = nan(nOptodes,1);
-
-for optInd = 1:(nOptodes/2)
-    Optode{optInd} = ['S',num2str(optInd)];
-    Optode{optInd + nOptodes/2} = ['D',num2str(optInd)];
-    X(optInd) = subX(strcmp(subName,['T',num2str(optInd)]));
-    X(optInd + nOptodes/2) = subX(strcmp(subName,['R',num2str(optInd)]));
-    Y(optInd) = subY(strcmp(subName,['T',num2str(optInd)]));
-    Y(optInd + nOptodes/2) = subY(strcmp(subName,['R',num2str(optInd)]));
-    Z(optInd) = subZ(strcmp(subName,['T',num2str(optInd)]));
-    Z(optInd + nOptodes/2) = subZ(strcmp(subName,['R',num2str(optInd)]));
-end
-outputTable = table(Optode,X,Y,Z);
-optodePositionsFilePath = fullfile(outputDir, "optode_positions.csv");
-writetable(outputTable, optodePositionsFilePath);
-
-%% export reference position
-fprintf("Exporting reference position\n");
-Reference = {'NzHS';'IzHS';'ARHS';'ALHS';'Fp1HS';'Fp2HS';'FzHS';'F3HS';...
-    'F4HS';'F7HS';'F8HS';'CzHS';'C3HS';'C4HS';'T3HS';'T4HS';'PzHS';'P3HS';...
-    'P4HS';'T5HS';'T6HS';'O1HS';'O2HS'};
-X = nan(length(Reference),1);
-Y = nan(length(Reference),1);
-Z = nan(length(Reference),1);
-refNamesSpmfnirs = {'NzHS';'IzHS';'ARHS';'ALHS';'CzHS'};
-refNamesFastrak = {'Nz';'Iz';'AR';'AL';'Cz'};
-for refInd = 1:length(refNamesFastrak)
-    X(strcmpi(Reference,refNamesSpmfnirs{refInd})) = subX(strcmpi(subName,refNamesFastrak{refInd}));
-    Y(strcmpi(Reference,refNamesSpmfnirs{refInd})) = subY(strcmpi(subName,refNamesFastrak{refInd}));
-    Z(strcmpi(Reference,refNamesSpmfnirs{refInd})) = subZ(strcmpi(subName,refNamesFastrak{refInd}));
-end
-outputTable = table(Reference,X,Y,Z);
-referencePositionFilePath = fullfile(outputDir, "reference_position.csv");
-writetable(outputTable, referencePositionFilePath);
-
-outputTable = table(Ch,Source,Detector);
-channelConfigOutputFilePath = fullfile(outputDir, "channel_config.csv");
-writetable(outputTable, channelConfigOutputFilePath);
+optodePositionsFilePath = exportOptodePositions(nOptodes, subName, subX, subY, subZ, outputDir);
+referencePositionFilePath = exportReferencePosition(subName, subX, subY, subZ, outputDir);
+channelConfigOutputFilePath = exportChannelConfigOutput(Ch, Source, Detector, outputDir);
 
 save(fullfile(outputDir, "plyToPOSoutput.mat"));
 
-%% run spm_fnirs spatial tool
-fprintf("Running spm_fnirs");
-F{1,1}(1,:) = referencePositionFilePath;
-F{1,1}(2,:) = optodePositionsFilePath;
-F{1,1}(3,:) = channelConfigOutputFilePath;
-F{2,1} = nirsModelPath;
-spm_fnirs_spatialpreproc_ui(F);
+runSpmFnirs(referencePositionFilePath, optodePositionsFilePath, channelConfigOutputFilePath, ...
+    nirsModelPath)
     
 close all
 end
 
 function [candidates] = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV)
-% getAndPlotStickerCandidatePoints Find coordinates of points in the ply whose hue is close to the
+% GETANDPLOTSTICKERCANDIDATEPOINTS Find coordinates of points in the ply whose hue is close to the
 %   given stickers' hue
 verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
 verColorsHSV = rgb2hsv(double(verColors)/255);
@@ -300,7 +214,7 @@ end
 
 function [capStars] = calculateCapStickerPositions(candidates, modelSphereR, ...
     radiusToStickerRatio, stickerMinGroupSize)
-% CALCULATECAPSTARPOSITIONS Approximates cap sticker positions using the
+% CALCULATECAPSTICKERPOSITIONS Approximates cap sticker positions using the
 %   candidate sticker points
 labels = divideStickerCandidatesIntoClouds(candidates, modelSphereR, radiusToStickerRatio);
 capStars = convertPointCloudsIntoPositions(candidates, labels, stickerMinGroupSize);
@@ -322,6 +236,15 @@ for i = 1:numConnectedComponents
 end
 % Throw away stickers that are too small
 capStars = mids(counter > stickerMinGroupSize,:); 
+end
+
+function [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, ...
+    missingStars)
+existStarsBitVec = ~ismember(modelStarLabels, missingStars);
+existStars = modelStars(existStarsBitVec, :);
+%modelTriplet = modelTriplet - mean(existStars);
+%existStars = existStars - mean(existStars);
+existLabels = modelStarLabels(existStarsBitVec);
 end
 
 function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, ...
@@ -392,6 +315,24 @@ for ii = 1:size(modelTripletOrder,1)
 end
 end
 
+function [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels)
+% LABELCAPSTARS Uses bestProjStars to label the cap stars
+fprintf("Applying the calculated regulation parameters\n");
+mate = maxWeightMatchingHelper(capStars, bestProjStars, modelSphereR);
+capStars(mate < 1,:) = [];
+mate(mate < 1) = [];
+capLabels = existLabels(mate);
+end
+
+function [] = plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels)
+% PLOTADJUSTEDMODELVSCAP Plot the cap labels (blue circles) vs. adjusted model labels (red stars) 
+figure; hold on; axis equal;
+plot3(capStars(:,1),capStars(:,2),capStars(:,3),'ob')
+text(capStars(:,1),capStars(:,2),capStars(:,3),capLabels,'color',[0,0,1])
+plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
+text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
+end
+
 function [bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead)
 % FINDOPTIMALSCALING Finds the best scaling parameters for fitting the
 %   current cap stars to the model head
@@ -420,4 +361,83 @@ for scX = scalespace
         end
     end
 end
+end
+
+% TODO: this is the graph that looks like a point cloud of the entire head.
+% Figure out what it means exactly and rename function
+function [] = graphResults(modelHead, bestCapHead, modelOnCapCap, capCap, modelPoints, ...
+    modelCapIdxs)
+% GRAPHRESULTS
+figure; hold on; axis equal; 
+scatter3(modelHead(:,1),modelHead(:,2),modelHead(:,3));
+scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
+scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
+scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
+scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(modelCapIdxs,3))
+end
+
+function [optodePositionsFilePath] = exportOptodePositions(nOptodes, subName, subX, subY, subZ, ...
+    outputDir)
+% EXPORTOPTODEPOSITIONS
+fprintf("Exporting optode position\n");
+Optode = cell(nOptodes,1);
+X = nan(nOptodes,1);
+Y = nan(nOptodes,1);
+Z = nan(nOptodes,1);
+
+for optInd = 1:(nOptodes/2)
+    Optode{optInd} = ['S',num2str(optInd)];
+    Optode{optInd + nOptodes/2} = ['D',num2str(optInd)];
+    X(optInd) = subX(strcmp(subName,['T',num2str(optInd)]));
+    X(optInd + nOptodes/2) = subX(strcmp(subName,['R',num2str(optInd)]));
+    Y(optInd) = subY(strcmp(subName,['T',num2str(optInd)]));
+    Y(optInd + nOptodes/2) = subY(strcmp(subName,['R',num2str(optInd)]));
+    Z(optInd) = subZ(strcmp(subName,['T',num2str(optInd)]));
+    Z(optInd + nOptodes/2) = subZ(strcmp(subName,['R',num2str(optInd)]));
+end
+outputTable = table(Optode, X, Y, Z);
+optodePositionsFilePath = fullfile(outputDir, "optode_positions.csv");
+writetable(outputTable, optodePositionsFilePath);
+end
+
+function [referencePositionFilePath] = exportReferencePosition(subName, subX, subY, subZ, ...
+    outputDir)
+%% export reference position
+fprintf("Exporting reference position\n");
+Reference = {'NzHS';'IzHS';'ARHS';'ALHS';'Fp1HS';'Fp2HS';'FzHS';'F3HS';...
+    'F4HS';'F7HS';'F8HS';'CzHS';'C3HS';'C4HS';'T3HS';'T4HS';'PzHS';'P3HS';...
+    'P4HS';'T5HS';'T6HS';'O1HS';'O2HS'};
+X = nan(length(Reference),1);
+Y = nan(length(Reference),1);
+Z = nan(length(Reference),1);
+refNamesSpmfnirs = {'NzHS';'IzHS';'ARHS';'ALHS';'CzHS'};
+refNamesFastrak = {'Nz';'Iz';'AR';'AL';'Cz'};
+for refInd = 1:length(refNamesFastrak)
+    X(strcmpi(Reference, refNamesSpmfnirs{refInd})) = ...
+        subX(strcmpi(subName, refNamesFastrak{refInd}));
+    Y(strcmpi(Reference, refNamesSpmfnirs{refInd})) = ...
+        subY(strcmpi(subName, refNamesFastrak{refInd}));
+    Z(strcmpi(Reference, refNamesSpmfnirs{refInd})) = ...
+        subZ(strcmpi(subName, refNamesFastrak{refInd}));
+end
+outputTable = table(Reference, X, Y, Z);
+referencePositionFilePath = fullfile(outputDir, "reference_position.csv");
+writetable(outputTable, referencePositionFilePath);
+end
+
+function [channelConfigOutputFilePath] = exportChannelConfigOutput(Ch, Source, Detector, outputDir)
+outputTable = table(Ch, Source, Detector);
+channelConfigOutputFilePath = fullfile(outputDir, "channel_config.csv");
+writetable(outputTable, channelConfigOutputFilePath);
+end
+
+function [] = runSpmFnirs(referencePositionFilePath, optodePositionsFilePath, ...
+    channelConfigOutputFilePath, nirsModelPath)
+% RUNSPMFNIRS runs the spm_fnirs spatial tool
+fprintf("Running spm_fnirs");
+F{1,1}(1,:) = referencePositionFilePath;
+F{1,1}(2,:) = optodePositionsFilePath;
+F{1,1}(3,:) = channelConfigOutputFilePath;
+F{2,1} = nirsModelPath;
+spm_fnirs_spatialpreproc_ui(F);
 end

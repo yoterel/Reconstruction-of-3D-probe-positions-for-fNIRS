@@ -67,7 +67,7 @@ net = data.net;
 
 % TODO: use video name/date for output folder?
 % Create output directory if needed
-outputDir = sprintf('%s%sresultsadult%s%d_results_stride_%d', ...
+outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
     pwd, filesep, filesep, frameSkip+1);
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
