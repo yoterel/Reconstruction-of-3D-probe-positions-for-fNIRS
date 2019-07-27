@@ -13,10 +13,6 @@ function [] = plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, 
 %                         considered a separate sticker.
 %   radiusToStickerRatio: Relative distance for which 2 points are considered the same sticker
 
-%capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
-%manualPoints = [-4.561 0.562 3.81]; %subject 2
-%manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
-manualPoints = [];
 mesh = plyread(plyFilePath);
 fprintf("Finished reading ply file\n");
 
@@ -38,49 +34,21 @@ fprintf("Loaded MNI model\n");
 fprintf("Performed sphere fit on model mni\n")
 candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 
-%% Divide sticker points into clouds
-% bbox = [max(vertices); min(vertices)];
-% radius = sqrt(sum((bbox(1,:)-bbox(2,:)).^2));
-radius = modelSphereR;
-thr = radius / radiusToStickerRatio;
-distMatrix = zeros(length(candidates));
-adjMatrix = zeros(length(candidates));
-for v = 1:length(candidates)
-    distMatrix(:,v) = sqrt(sum([candidates(:,1)-candidates(v,1) candidates(:,2)-candidates(v,2) candidates(:,3)-candidates(v,3)].^2,2));
-end
-adjMatrix(distMatrix < thr) = 1;
-[labels, ~] = graphConnectedComponents(adjMatrix);
-
-%% Convert sticker point clouds into positions, calcualte size of each sticker (in points), remove small groups
-figure; axis equal; hold on
-counter = zeros(max(labels),1);
-mids = zeros(max(labels),3);
-for i = 1:max(labels)
-    scatter3(candidates(labels == i,1),candidates(labels == i,2),candidates(labels == i,3));
-    counter(i) = size(candidates(labels == i,1),1);
-    mids(i,:) = sum(candidates(labels == i,:),1)./counter(i);
-end
-% [c,ia,ic] = unique(labels);
-% d = [true; diff(ic) ~= 0; true];  % TRUE if values change
-% n = diff(find(d));               % Number of repetitions
-% rts = find(n > groupSize);
-% rts = n(rts);
-%%
-%plot3(mids(counter > groupSize,1),mids(counter > groupSize,2),mids(counter > groupSize,3),'p','markersize',25,'MarkerFaceColor','k');
-% X = [mesh.vertex.x,mesh.vertex.y,mesh.vertex.z];
-% X = X - mean(X);
-% plot3(X(:,1),X(:,2),X(:,3),'.');
-% Throw away stickers that are too small
-capStars = mids(counter > stickerMinGroupSize,:); 
+capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
+    stickerMinGroupSize);
 
 %% Add the manually added points
+%capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
+%manualPoints = [-4.561 0.562 3.81]; %subject 2
+%manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
+manualPoints = [];
 if ~isempty(manualPoints)
     capStars = [capStars; manualPoints*modelSphereR/capSphereR+modelSphereC-capSphereC];
 end
 
-%%
 %capStars = capStars - mean(capStars);% implicit expansion
-plot3(capStars(:,1),capStars(:,2),capStars(:,3),'p','markersize',25,'MarkerFaceColor','k');
+plot3(capStars(:,1),capStars(:,2),capStars(:,3), 'p', 'markersize', 25, 'MarkerFaceColor', 'k');
+
 %% save for model. Order of labels change from run to run.
 % close all
 % modelStars = mids(counter > groupSize,:);
@@ -382,4 +350,47 @@ candidates = vertices(abs(verColorsHSV(:,1)-trgHue) < 0.15 & ...
 fprintf("Found sticker candidate vertices\n");
 % Plot the candidates
 plot3(candidates(:,1), candidates(:,2), candidates(:,3), '.');
+end
+
+function [labels] = divideStickerCandidatesIntoClouds(candidates, modelSphereR, radiusToStickerRatio)
+% DIVIDESTICKERCANDIDATESINTOCLOUD Groups the sticker candidate points into
+%   point clouds, and returns a label column vector specifying the cloud id for
+%   each sticker
+distMatrix = zeros(length(candidates));
+for v = 1:length(candidates)
+    distMatrix(:,v) = sqrt(sum([candidates(:,1)-candidates(v,1) candidates(:,2)-candidates(v,2) candidates(:,3)-candidates(v,3)].^2,2));
+end
+% Initialize a binary matrix representing a graph where each two points
+% close enough to be on the same sticker are connected
+adjMatrix = zeros(length(candidates));
+maxStickerLength = modelSphereR / radiusToStickerRatio;
+adjMatrix(distMatrix < maxStickerLength) = 1;
+% Labels is a column vector containing a connected component id for each candidate vertex
+[labels, ~] = graphConnectedComponents(adjMatrix);
+end
+
+function [capStars] = calculateCapStickerPositions(candidates, modelSphereR, ...
+    radiusToStickerRatio, stickerMinGroupSize)
+% CALCULATECAPSTARPOSITIONS Approximates cap sticker positions using the
+%   candidate sticker points
+labels = divideStickerCandidatesIntoClouds(candidates, modelSphereR, radiusToStickerRatio);
+capStars = convertPointCloudsIntoPositions(candidates, labels, stickerMinGroupSize);
+fprintf("Calculated approximate sticker positions\n");
+end
+
+function [capStars] = convertPointCloudsIntoPositions(candidates, labels, stickerMinGroupSize)
+% CONVERTPOINTCLOUDSINTOPOSITIONS Converts the grouped candidate points
+%   into individual sticker positions
+figure; axis equal; hold on
+numConnectedComponents = max(labels);
+counter = zeros(numConnectedComponents, 1);
+mids = zeros(numConnectedComponents, 3);
+for i = 1:numConnectedComponents
+    relevantCandidates = candidates(labels == i,:);
+    scatter3(relevantCandidates(:,1), relevantCandidates(:,2), relevantCandidates(:,3));
+    counter(i) = size(relevantCandidates, 1);
+    mids(i,:) = sum(relevantCandidates, 1)./counter(i);
+end
+% Throw away stickers that are too small
+capStars = mids(counter > stickerMinGroupSize,:); 
 end
