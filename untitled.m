@@ -70,7 +70,7 @@ handles.current_data = handles.peaks;
       if (isfield(handles, 'clicked_pt'))
         delete(handles.clicked_pt);
       end
-      handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 1, 'r');
+      handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
   end
 set(surf(handles.current_data), 'ButtonDownFcn', @my_callback);
 hold on;
