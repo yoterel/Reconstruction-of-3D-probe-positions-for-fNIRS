@@ -33,16 +33,12 @@ fprintf("Loaded MNI model\n");
 % vertices on the cap (one can also scale modelStars instead, as was done before in a comment)
 [modelSphereC, modelSphereR] = sphereFit([modelMNI.X,modelMNI.Y,modelMNI.Z]);
 fprintf("Performed sphere fit on model mni\n")
-candidates = candidates * modelSphereR / capSphereR+modelSphereC - capSphereC;
 
+relativeR = modelSphereR / capSphereR;
+relativeC = modelSphereC - capSphereC;
+candidates = candidates * relativeR + relativeC;
 capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize);
-
-% The last 9 points in the model MNI are the relevant ones (TODO: be more
-% precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
-headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
-modelStars = table2array(modelMNI(headAndCapIdxs, 2:4));
-modelStarLabels = modelMNI.labels(headAndCapIdxs);
 
 %% Add the manually added points
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
@@ -50,7 +46,7 @@ modelStarLabels = modelMNI.labels(headAndCapIdxs);
 %manualPoints = [-1.246 1.953 -1.643; -0.893 1.65 -1.731]; %2783a
 manualPoints = [];
 if ~isempty(manualPoints)
-    capStars = [capStars; manualPoints*modelSphereR/capSphereR+modelSphereC-capSphereC];
+    capStars = [capStars;manualPoints * relativeR + relativeC];
 end
 
 % TODO: this is probably figure 2. Add description.
@@ -61,6 +57,11 @@ plot3(capStars(:,1), capStars(:,2), capStars(:,3), 'p', 'markersize', 25, 'Marke
 % TODO: why are we using missing stars? Aren't they supplied by the user?
 % missingStars = {'Nz';'Iz';'AR';'AL'};
 missingStars = {}; % TODO: how do we use this? With manual points? Are these missing stars on the model?
+% The last 9 points in the model MNI are the relevant ones (TODO: be more
+% precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
+headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
+modelStars = table2array(modelMNI(headAndCapIdxs, 2:4));
+modelStarLabels = modelMNI.labels(headAndCapIdxs);
 [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, missingStars);
 [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, modelSphereR);
 [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels);
