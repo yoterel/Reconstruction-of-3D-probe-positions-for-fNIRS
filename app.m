@@ -22,7 +22,7 @@ function varargout = app(varargin)
 
 % Edit the above text to modify the response to help app
 
-% Last Modified by GUIDE v2.5 09-Aug-2019 11:21:57
+% Last Modified by GUIDE v2.5 10-Aug-2019 12:38:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -61,6 +61,25 @@ guidata(hObject, handles);
 % UIWAIT makes app wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
+end
+
+% --- Outputs from this function are returned to the command line.
+function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+end
+
+
+% --- Executes on button press in start_btn.
+function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
+% hObject    handle to start_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);
@@ -76,16 +95,17 @@ capNetModelPath = fullfile('capnet', filesep, 'model.mat');
 % Name of nvm file outputed by VSFM
 vsfmOutputFileName = "dense"; 
 
-fprintf("Loading CapNet data\n");
-data = load(capNetModelPath); 
-net = data.net;
+setStatusText(handles, "Loading CapNet data");
+%data = load(capNetModelPath); 
+%net = data.net;
 
 % TODO: use video name/date for output folder?
 % Create output directory if needed
 outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
     pwd, filesep, filesep, frameSkip+1);
 vsfmInputDir = fullfile(outputDir, "vsfmInput");
-[plyFilePath] = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net);
+%[plyFilePath] = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net);
+plyFilePath = "C:\TEMP\denseNet.0.ply";
 
 % Video folder should also contain a stickerHSV.txt file, which contains a
 % noramlized (between 0 and 1) HSV representation of the model's sticker's
@@ -100,18 +120,17 @@ shimadzuFilePath = "C:\TEMP\adult.txt";
 
 plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
 addpath(spmPath, genpath(spmFNIRSPath));
-fprintf("Converting .ply file to .pos file\n");
-plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
-    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio);
+setStatusText(handles, "Converting .ply file to .pos file");
+%plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
+%    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio);
+
+candidates = getStickerCandidates(handles, plyFilePath, stickerHSV);
 end
 
-% --- Outputs from this function are returned to the command line.
-function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
-% varargout  cell array for returning output args (see VARARGOUT);
-% hObject    handle to figure
+% --- If Enable == 'on', executes on mouse press in 5 pixel border.
+% --- Otherwise, executes on mouse press in 5 pixel border or over start_btn.
+function start_btn_ButtonDownFcn(hObject, ~, handles)
+% hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-% Get default command line output from handles structure
-varargout{1} = handles.output;
 end

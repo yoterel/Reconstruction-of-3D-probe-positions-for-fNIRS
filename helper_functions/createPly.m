@@ -17,8 +17,7 @@ makeListAndConnection(vsfmInputDir, round(frameRate), frameSkip, imgResultFilePr
     connectionsFileName);
 runVSFM(outputDir, vsfmInputDir, connectionsFileName, toolPath, vsfmOutputFileName);
 
-%plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
-plyFilePath = "C:\TEMP\denseNet.0.ply";
+plyFilePath = strcat(outputDir, filesep, vsfmOutputFileName, ".0.ply");
 end
 
 function runVSFM(outputFolder, inputFolder, connectionsFileName, toolPath, vsfmOutputFileName)
