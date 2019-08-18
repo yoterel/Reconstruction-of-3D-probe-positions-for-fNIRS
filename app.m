@@ -104,7 +104,8 @@ setStatusText(handles, "Loading CapNet data");
 outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
     pwd, filesep, filesep, frameSkip+1);
 vsfmInputDir = fullfile(outputDir, "vsfmInput");
-%[plyFilePath] = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net);
+%plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
+%    frameSkip);
 plyFilePath = "C:\TEMP\denseNet.0.ply";
 
 % Video folder should also contain a stickerHSV.txt file, which contains a

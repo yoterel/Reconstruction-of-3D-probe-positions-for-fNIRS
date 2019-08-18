@@ -1,5 +1,5 @@
 function [plyFilePath] = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, ...
-    toolPath, net)
+    toolPath, net, frameSkip)
 %CREATEPLY Summary of this function goes here
 %   Detailed explanation goes here
 if ~exist(outputDir, 'dir')
