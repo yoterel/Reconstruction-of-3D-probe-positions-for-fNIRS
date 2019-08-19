@@ -1,0 +1,12 @@
+vidPath = "C:\TEMP\denseNet.0.ply";
+modelPath = "C:\TEMP\SagiFirstCut.ply";
+vidPc = pcread(vidPath);
+modelPc = pcread(modelPath);
+pcshow(vidPc);
+figure;
+hold on;
+pcshow([modelPc.Location(:,1), modelPc.Location(:,2), modelPc.Location(:,3)], 'r');
+tform = pcregistericp(vidPc, modelPc);
+tformedPc = pctransform(vidPc, tform);
+pcshow([tformedPc.Location(:,1), tformedPc.Location(:,2), tformedPc.Location(:,3)], 'b');
+a = 5;

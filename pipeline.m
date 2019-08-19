@@ -52,8 +52,9 @@ net = data.net;
 outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
     pwd, filesep, filesep, frameSkip+1);
 vsfmInputDir = fullfile(outputDir, "vsfmInput");
-plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
-    frameSkip);
+% plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
+%     frameSkip);
+plyFilePath = "C:\TEMP\denseNet.0.ply";
 
 % Video folder should also contain a stickerHSV.txt file, which contains a
 % noramlized (between 0 and 1) HSV representation of the model's sticker's
