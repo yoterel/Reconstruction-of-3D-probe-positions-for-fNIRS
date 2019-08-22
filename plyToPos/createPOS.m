@@ -1,7 +1,13 @@
 function createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, modelOnCapCap, ...
     modelHeadIdxs, bestCapHead)
-%UNTITLED4 Summary of this function goes here
-%   Detailed explanation goes here
+%CREATEPOS ...
+%          outputDir: 
+%      nirsModelPath:
+%   shimadzuFilePath:
+%        modelLabels:
+%      modelOnCapCap:
+%      modelHeadIdxs:
+%        bestCapHead:
 %% create files for spm_fnirs and for Homer2
 fprintf("Creating files for spm_fnirs\n");
 if ~exist(outputDir, 'dir')

@@ -8,9 +8,9 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"'; 
 
 % Location of raw video file
-%sourceFiles = dir('E:\globus_data\**\*.avi')(1);
-%sourceFiles = dir('C:\Globus\emberson-consortium\VideoRecon\MATLAB\model\*.MP4')(1);
-vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
+%vidPath = dir('E:\globus_data\**\*.avi')(1);
+%vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\results\**\*.MP4');
+vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\results\adult\adult14\video1\*.MP4');
 vidPath = vidPath(1);
 
 % Contains info about the model of the cap itself, used by plyToPOS
@@ -49,12 +49,12 @@ data = load(capNetModelPath);
 net = data.net;
 
 % TODO: use video name/date for output folder?
-outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
+outputDir = sprintf('%s%sresults%sadult14_stride_%d', ...
     pwd, filesep, filesep, frameSkip+1);
 vsfmInputDir = fullfile(outputDir, "vsfmInput");
-% plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
-%     frameSkip);
+%plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, frameSkip);
 plyFilePath = "C:\TEMP\denseNet.0.ply";
+%plyFilePath ="C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 
 % Video folder should also contain a stickerHSV.txt file, which contains a
 % noramlized (between 0 and 1) HSV representation of the model's sticker's

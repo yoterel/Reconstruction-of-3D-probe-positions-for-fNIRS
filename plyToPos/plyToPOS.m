@@ -19,9 +19,7 @@ fprintf("Finished reading ply file, finding sticker candidate points\n");
 
 vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
 candidates = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV);
-
-[capSphereC, capSphereR] = sphereFit(candidates);
-fprintf("Performed sphere fit on candidates 1\n");
+fprintf("Calculated sticker candidate points\n");
 
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
 load(mniModelPath, 'modelMNI');
@@ -29,14 +27,11 @@ load(mniModelPath, 'modelMNI');
 %modelMNI = infantModelMNI;
 fprintf("Loaded MNI model\n");
 
-% Find an approximating sphere for the model, use it to scale and translate the sticker candidate 
-% vertices on the cap (one can also scale modelStars instead, as was done before in a comment)
-[modelSphereC, modelSphereR] = sphereFit([modelMNI.X,modelMNI.Y,modelMNI.Z]);
-fprintf("Performed sphere fit on model mni\n")
-
-relativeR = modelSphereR / capSphereR;
-relativeC = modelSphereC - capSphereC;
-candidates = candidates * relativeR + relativeC;
+% Use spherical approximations for the model & cap, use them to scale and translate the sticker
+% candidate vertices on the cap (one can scale modelStars instead, as done before in a comment)
+[candidates, ~, modelSphereR] = ...
+    sphereScaleAndTranslate([modelMNI.X,modelMNI.Y,modelMNI.Z], candidates);
+fprintf("Used approximating spheres to scale and translate candidate sticker points\n");
 capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize);
 
@@ -74,8 +69,8 @@ capStars = capStars(:,1:3);
 
 % reorder capStars and capLabels according to modelLabels
 tempCapStars = capStars;
-for ii = 1:length(existLabels)
-    capStars(ii,:) = tempCapStars(strcmp(capLabels, existLabels{ii}), :);
+for i = 1:length(existLabels)
+    capStars(i,:) = tempCapStars(strcmp(capLabels, existLabels{i}), :);
 end
 capLabels = existLabels;
 
@@ -107,9 +102,9 @@ modelCap = modelPoints(modelCapIdxs,:);
 modelStarsToErase = true(length(modelCap(:,1)),1);
 capCapLabels = capLabels(capCapIdxs);
 modelCapLabels = modelLabels(modelCapIdxs);
-for ii = 1:size(modelCapLabels,1)
-    if any(ismember(capCapLabels,modelCapLabels{ii}))
-        modelStarsToErase(ii) = false;
+for i = 1:size(modelCapLabels,1)
+    if any(ismember(capCapLabels,modelCapLabels{i}))
+        modelStarsToErase(i) = false;
     end
 end
 modelCap(modelStarsToErase,:) = [];
