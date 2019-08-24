@@ -1,26 +1,30 @@
-function [mate] = minDistanceMatchPoints(sourcePoints, targetPoints, modelSphereR)
-%MINDISTANCEMATCHPOINTS Returns an array the same size as sourcePoints
-%   which uniquely maps each point in sourcePoints to a corresponding point
-%   in targetPoints, such that mate(i) is the index of a point in
-%   targetPoints mapped to sourcePoints(i), or -1 if the point is unmatched
-%   (this should not occur unless targetPoints contains less points than
-%   sourcePoints).
+function [mate] = minDistanceMatchPoints(sourcePoints, targetPoints, maxDistance)
+%MINDISTANCEMATCHPOINTS Returns an array of size at most the size of
+%   sourcePoints which uniquely maps points in sourcePoints to
+%   corresponding points in targetPoints, under the constraint that the
+%   distance between each mapped pair is less than the maximal allowed
+%   distance. The returned mapping satisfies that mate(i) is the index of a
+%   point in targetPoints mapped to sourcePoints(i), or -1 if the point is
+%   unmatched. 
+%   If there are at least as many targetPoints as sourcePoints,
+%   and the distance between each pair is less than the given maximum
+%   allowed distance, no points should be left unmatched.
 %
-%   The matching is calculated by attempting to minimize the total
+%   The matching is calculated by attempting to minimize the total squared
 %   euclidean distance between pairs of matched points, using a maximum
 %   weight matching algorithm in graphs.
 n = size(sourcePoints, 1);
 m = size(targetPoints, 1);
 
 % We build a graph with m + n vertices, where edges are only between source
-% points and target points, and the weight is inversly proportional to the
-% distance between each pair of points.
-edges = zeroes(n * m, 3);
+% points and target points that are close enough, and the weight is
+% inversly proportional to the distance between each pair of points.
+edges = zeros(n * m, 3);
 numEdges = 0;
 for j = 1:n
     for k = 1:m
         d = norm(sourcePoints(j, :) - targetPoints(k, :));
-        if (d < modelSphereR)
+        if (d < maxDistance)
             numEdges = numEdges + 1;
             edges(numEdges, 1) = j + m;
             edges(numEdges, 2) = k;

@@ -29,8 +29,8 @@ fprintf("Loaded MNI model\n");
 
 % Use spherical approximations for the model & cap, use them to scale and translate the sticker
 % candidate vertices on the cap (one can scale modelStars instead, as done before in a comment)
-[candidates, ~, modelSphereR] = ...
-    sphereScaleAndTranslate([modelMNI.X,modelMNI.Y,modelMNI.Z], candidates);
+modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
+[candidates, ~, modelSphereR] = sphereScaleAndTranslate(modelPoints, candidates);
 fprintf("Used approximating spheres to scale and translate candidate sticker points\n");
 capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize);
@@ -64,7 +64,7 @@ modelStarLabels = modelMNI.labels(headAndCapIdxs); % Ordered labels of stars on 
 plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels);
 
 % rotate model to MNI. Use this rotation for the cap
-capStars = [capStars ones(length(capStars), 1)] * (bestRegParams.M^-1)';
+capStars = applyRegParams(capStars, bestRegParams, true);
 capStars = capStars(:,1:3);
 
 % reorder capStars and capLabels according to modelLabels
@@ -77,7 +77,6 @@ capLabels = existLabels;
 %% perform grid search of axis-aligned scaling, and realign at each step.
 % USING ONLY THE HEAD POINTS
 % TODO: use consts for point labels?
-modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
 modelLabels = modelMNI.labels;
 fprintf("Performing grid search of axis-aligned scaling\n");
 headLabelNames = {'Nz', 'Cz', 'AR', 'AL'};
@@ -93,7 +92,7 @@ modelHead = modelPoints(modelHeadIdxs,:);
 
 % rotate + scale model to the best aligned result.
 fprintf("Perfroming rotations & scaling\n");
-scaledCap = [capStars.*bestScale ones(size(capStars,1),1)]*bestReg.M';
+scaledCap = applyRegParams(capStars.*bestScale, bestReg);
 scaledCap = scaledCap(:,1:3);
 %scaledModel = [modelPoints.*bestScale ones(size(modelPoints,1),1)]*bestReg.M';
 
@@ -196,9 +195,9 @@ function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, cap
 %   adjusted model stars
 %
 %   INPUT:
-%       existsStars: array of locations of model stars which exist on the
-%           cap
-%          capStars: array of locations of cap stars
+%       existsStars: Array of locations of model stars which exist on the
+%                    cap
+%          capStars: Array of locations of cap stars
 %      modelSphereR: Radius of the model's approximating sphere
 %
 %   OUTPUT:
@@ -206,16 +205,10 @@ function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, cap
 %           translation and rotation for adjusting the model to the cap
 %       bestProjStars: coordinates of the model stars transformed using the
 %           optimal reg params
-
-% capFront = capStars(4,:);
-% capLeft = capStars(3,:);
-% capRight = capStars(5,:);
-% testCapTriplet = [capFront;capRight;capLeft];
-
 % TODO: validate that existStars and capStars are the same length?
-% Two n * 3 matrices containing possible triplets in 1:size(..., 1)
 n = size(capStars, 1);
 m = size(existStars, 1);
+% Two n * 3 matrices containing all possible triplets in 1:n, 1:m
 capTripletOrder = nchoosek(1:n, 3);
 modelTripletOrder = nchoosek(1:m, 3);
 bestD = inf;
@@ -223,15 +216,7 @@ fprintf("Processing triplets\n");
 % TODO: maybe there's a way to accelerate this part? Use all cores?
 for ii = 1:size(modelTripletOrder,1)
     fprintf("Triplet number %d\n", ii);
-    modelTriplet = existStars(modelTripletOrder(ii,:),:);
-%     tModelStars = zeros(size(existStars));
-%     for jj = 1:size(existStars,1)
-%         A = [modelTriplet w*eye(3)];
-% %         %tModelStars(jj,:) = existStars(jj,:)/modelTriplet;
-% tModelStars(jj,:) = A'\[existStars(jj,:) zeros(1,3)]';
-% %         tModelStars(jj,:) = [existStars(jj,:) zeros(1,3)]*A'*(A*A')^-1;
-%     end
-    
+    modelTriplet = existStars(modelTripletOrder(ii,:),:);    
     for kk = 1:size(capTripletOrder,1)
         currTriplet = capTripletOrder(kk,:);
         permTriplet = perms(currTriplet);
@@ -241,36 +226,34 @@ for ii = 1:size(modelTripletOrder,1)
             % translation between the two triplets
             regParams = absor(modelTriplet',capTriplet');
             
-            % Transform the model stars and project them on the cap TODO: sure???
-            %tform = fitgeotrans(modelTriplet,capTriplet,'nonreflective similarity');
-            modelProjStars = [existStars ones(m, 1)]*regParams.M';
+            % TODO: Make sure I understand this part. Maybe the double
+            % transformations are unnecessary (we transform both the model
+            % and late on the cap).
+            % Transform the model stars and project them on the cap
+            modelProjStars = applyRegParams(existStars, regParams);
             modelProjStars = modelProjStars(:,1:3);
-            %             modelProjStars = zeros(size(existStars));
-            %             for mm = 1:size(existStars,1)
-            %                 modelProjStars(mm,:) = tModelStars(mm,:)*capTriplet;
-            %             end
+%             modelProjStars = zeros(size(existStars));
+%             for mm = 1:size(existStars,1)
+%                 modelProjStars(mm,:) = tModelStars(mm,:)*capTriplet;
+%             end
 %             dists = ones(size(existStars,1),size(modelStars,1));
 %             for dd = 1:size(existStars,1)
 %                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
 %             end
-            %[match, cost] = munkres(dists);
+%             [match, cost] = munkres(dists);
             
             mate = minDistanceMatchPoints(capStars, modelProjStars, modelSphereR);
             if any(mate < 0) || length(mate) < n
-                % The case where the matching isn't complete
-                % TODO: could this happen if we validate sizes of star
-                % arrays?
+                % The case where the matching isn't complete (should occur
+                % only if some points are further apart than the sphere's
+                % radius).
                 d = inf;
             else
                 d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
             end
 
-            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
-            %if ( cost < bestD )
-            if sum(d) < bestD
-                %bestD = cost;
-                bestD = sum(d);
-                %bestLabels = existLabels(idx);
+            if d < bestD
+                bestD = d;
                 bestProjStars = modelProjStars;
                 bestRegParams = regParams;
             end
@@ -279,10 +262,24 @@ for ii = 1:size(modelTripletOrder,1)
 end
 end
 
+function [transformed] = applyRegParams(points, regParams, invert)
+% APPLYREGPARAMS transforms the given set of points using the given
+% regParams struct (usually returned from absor)
+transformationMatrix = regParams.M;
+if (nargin > 2 && invert)
+    transformationMatrix = transformationMatrix^-1;
+end
+transformed = [points, ones(size(points, 1), 1)] * transformationMatrix;
+end
+
 function [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels)
 % LABELCAPSTARS Uses bestProjStars to label the cap stars
 fprintf("Applying the calculated regulation parameters\n");
 mate = minDistanceMatchPoints(capStars, bestProjStars, modelSphereR);
+% TODO: is it possible that there are unmatched entries? In such case the
+% error shold be inf and we should probably just stop the script. In
+% general, this function can probably be deleted and we can just return the
+% mate we found in calculateBestRegParams
 capStars(mate < 1,:) = [];
 mate(mate < 1) = [];
 capLabels = existLabels(mate);
