@@ -265,7 +265,7 @@ end
 function [transformed] = applyRegParams(points, regParams, invert)
 % APPLYREGPARAMS transforms the given set of points using the given
 % regParams struct (usually returned from absor)
-transformationMatrix = regParams.M;
+transformationMatrix = regParams.M';
 if (nargin > 2 && invert)
     transformationMatrix = transformationMatrix^-1;
 end
