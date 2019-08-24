@@ -56,8 +56,8 @@ missingStars = {}; % TODO: how do we use this? With manual points? Are these mis
 % The last 9 points in the model MNI are the relevant ones (TODO: be more
 % precise here, the points is that headAndCapIdx are the last 9 indices in modelMNI)
 headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1); 
-modelStars = table2array(modelMNI(headAndCapIdxs, 2:4));
-modelStarLabels = modelMNI.labels(headAndCapIdxs);
+modelStars = table2array(modelMNI(headAndCapIdxs, 2:4)); % Coordinates of stars on model
+modelStarLabels = modelMNI.labels(headAndCapIdxs); % Ordered labels of stars on model
 [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, missingStars);
 [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, modelSphereR);
 [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels);
@@ -180,6 +180,8 @@ end
 
 function [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, ...
     missingStars)
+% FINDEXISTINGSTARSANDLABELS returns ordered arrays of the stars and labels
+%   in the model that are in the vide ply.
 existStarsBitVec = ~ismember(modelStarLabels, missingStars);
 existStars = modelStars(existStarsBitVec, :);
 %modelTriplet = modelTriplet - mean(existStars);
@@ -192,16 +194,30 @@ function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, cap
 % CALCULATEBESTREGPARAMS Calculates the optimal reg params for adjusting
 %   existing model stars to the cap stars. Returns the parameters and the
 %   adjusted model stars
+%
+%   INPUT:
+%       existsStars: array of locations of model stars which exist on the
+%           cap
+%          capStars: array of locations of cap stars
+%      modelSphereR: Radius of the model's approximating sphere
+%
+%   OUTPUT:
+%       bestRegParams: struct returned by absor which approximates the optimal
+%           translation and rotation for adjusting the model to the cap
+%       bestProjStars: coordinates of the model stars transformed using the
+%           optimal reg params
 
 % capFront = capStars(4,:);
 % capLeft = capStars(3,:);
 % capRight = capStars(5,:);
 % testCapTriplet = [capFront;capRight;capLeft];
 
-capTripletOrder = nchoosek(1:size(capStars,1),3);
-% capTripletOrder = [4,3,5];
-
-modelTripletOrder = nchoosek(1:size(existStars,1),3);
+% TODO: validate that existStars and capStars are the same length?
+% Two n * 3 matrices containing possible triplets in 1:size(..., 1)
+n = size(capStars, 1);
+m = size(existStars, 1);
+capTripletOrder = nchoosek(1:n, 3);
+modelTripletOrder = nchoosek(1:m, 3);
 bestD = inf;
 fprintf("Processing triplets\n");
 % TODO: maybe there's a way to accelerate this part? Use all cores?
@@ -221,9 +237,13 @@ for ii = 1:size(modelTripletOrder,1)
         permTriplet = perms(currTriplet);
         for ll = 1:size(permTriplet,1)
             capTriplet = capStars(permTriplet(ll,:),:);
+            % regParams is a struct containing the optimal rotation and
+            % translation between the two triplets
             regParams = absor(modelTriplet',capTriplet');
+            
+            % Transform the model stars and project them on the cap TODO: sure???
             %tform = fitgeotrans(modelTriplet,capTriplet,'nonreflective similarity');
-            modelProjStars = [existStars ones(size(existStars,1),1)]*regParams.M';
+            modelProjStars = [existStars ones(m, 1)]*regParams.M';
             modelProjStars = modelProjStars(:,1:3);
             %             modelProjStars = zeros(size(existStars));
             %             for mm = 1:size(existStars,1)
@@ -234,8 +254,12 @@ for ii = 1:size(modelTripletOrder,1)
 %                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
 %             end
             %[match, cost] = munkres(dists);
-            mate = maxWeightMatchingHelper(capStars, modelProjStars, modelSphereR);
-            if any(mate < 0) || length(mate) < size(capStars,1)
+            
+            mate = minDistanceMatchPoints(capStars, modelProjStars, modelSphereR);
+            if any(mate < 0) || length(mate) < n
+                % The case where the matching isn't complete
+                % TODO: could this happen if we validate sizes of star
+                % arrays?
                 d = inf;
             else
                 d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
@@ -258,7 +282,7 @@ end
 function [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels)
 % LABELCAPSTARS Uses bestProjStars to label the cap stars
 fprintf("Applying the calculated regulation parameters\n");
-mate = maxWeightMatchingHelper(capStars, bestProjStars, modelSphereR);
+mate = minDistanceMatchPoints(capStars, bestProjStars, modelSphereR);
 capStars(mate < 1,:) = [];
 mate(mate < 1) = [];
 capLabels = existLabels(mate);

@@ -5,9 +5,31 @@ function [cleanedPc] = pcRemoveOutliers(pc, stdev)
 if (nargin < 2)
     stdev = 2;
 end
-n = size(pc, 1);
-centerOfMass = sum(pc) / n;
-distances = sqrt(sum((pc-centerOfMass).^2, 2));
+vertices = pc;
+isPointCloudObj = strcmp(class(pc), 'pointCloud');
+if (isPointCloudObj)
+    vertices = pc.Location;
+end
+n = size(vertices, 1);
+centerOfMass = sum(vertices) / n;
+distances = sqrt(sum((vertices - centerOfMass).^2, 2));
 normalized = normalize(distances);
-cleanedPc = pc(abs(normalized) < stdev, :);
+mask = abs(normalized) < stdev;
+if (isPointCloudObj)
+    vertices = returnFilteredArr(vertices, mask, n);
+    colors = returnFilteredArr(pc.Color, mask, n);
+    normals = returnFilteredArr(pc.Normal, mask, n);
+    intensities = returnFilteredArr(pc.Intensity, mask, n);
+    cleanedPc = pointCloud(vertices, 'Color', colors, 'Normal', normals, 'Intensity', intensities);
+else
+    cleanedPc = pc(mask, :);
+end
+end
+
+function [filtered] = returnFilteredArr(arr, mask, n)
+if (size(arr, 1) == n)
+    filtered = arr(mask, :);
+else
+    filtered = [];
+end
 end
