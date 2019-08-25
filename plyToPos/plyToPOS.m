@@ -79,8 +79,6 @@ for i = 1:length(existLabels)
 end
 capLabels = existLabels;
 
-%% perform grid search of axis-aligned scaling, and realign at each step.
-% USING ONLY THE HEAD POINTS
 % TODO: use consts for point labels?
 modelLabels = modelMNI.labels;
 fprintf("Performing grid search of axis-aligned scaling\n");
@@ -93,11 +91,8 @@ capCapIdxs = ismember(capLabels, capLabelNames);
 modelCapIdxs = ismember(modelLabels, capLabelNames) & existPointsBitVec;
 
 modelHead = modelPoints(modelHeadIdxs,:);
-[bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead);
-
-% rotate + scale model to the best aligned result.
-fprintf("Perfroming rotations & scaling\n");
-scaledCap = applyRegParams(capStars.*bestScale, bestReg);
+[bestReg, capHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead);
+scaledCapStars = applyRegParams(capStars.*bestScale, bestReg);
 %scaledModel = [modelPoints.*bestScale ones(size(modelPoints,1),1)]*bestReg.M';
 
 % rotate scaled model to match the best to the CAP POINTS ONLY.
@@ -111,16 +106,13 @@ for i = 1:size(modelCapLabels,1)
     end
 end
 modelCap(modelStarsToErase,:) = [];
-capCap = scaledCap(capCapIdxs,:);
+capCap = scaledCapStars(capCapIdxs,:);
 [modelReg, ~] = absor(modelCap',capCap');
-modelOnCapCap = [modelPoints ones(size(modelPoints,1),1)]*modelReg.M';
-modelOnCapCap(:,4) = [];
+modelOnCap = applyRegParams(modelPoints, modelReg);
 
-graphResults(modelHead, bestCapHead, modelOnCapCap, capCap, modelPoints, modelCapIdxs);
-% use fiber points from resulting model to estimate positions.
-
-createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, modelOnCapCap, ...
-    modelHeadIdxs, bestCapHead);
+graphResults(modelHead, capHead, modelOnCap, capCap, modelPoints, modelCapIdxs);
+[subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, capHead, modelHeadIdxs);
+createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, subX, subY, subZ);
     
 close all
 end
@@ -221,7 +213,7 @@ fprintf("Processing triplets\n");
 totalLoopStart = tic;
 minDistanceMatchElapsed = 0;
 for ii = 1:size(modelTripletOrder,1)
-    fprintf("Triplet number %f\n", ii);
+    fprintf("Triplet number %d\n", ii);
     modelTriplet = existStars(modelTripletOrder(ii,:),:);    
     for kk = 1:size(capTripletOrder,1)
         currTriplet = capTripletOrder(kk,:);
@@ -304,6 +296,8 @@ end
 function [bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead)
 % FINDOPTIMALSCALING Finds the best scaling parameters for fitting the
 %   current cap stars to the model head
+% Perform grid search of axis-aligned scaling, using only the head points,
+% and realign at each step.
 fprintf("Finding optimal scaling parameters\n");
 capHead = capStars(capHeadIdxs,:);
 scalespace = logspace(log10(0.5),log10(2),20);
@@ -313,13 +307,13 @@ for scX = scalespace
         for scZ = scalespace
             testStars = capHead.*[scX,scY,scZ]; % implicit expansion
             testReg = absor(testStars', modelHead');
-            testStars = [testStars ones(size(testStars,1),1)]*testReg.M';
+            testStars = applyRegParams(testStars, testReg);
             testStars = testStars(:,1:3);
-            %%%% maybe not needed, need to use the labels
-            [~,d] = knnsearch(modelHead,testStars); 
+            % TODO: maybe not needed, need to use the labels
+            [~,d] = knnsearch(modelHead, testStars); 
             %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
             %if ( cost < bestD )
-            cost = sqrt(sum(d.^2));
+            cost = sum(d.^2);
             if cost < bestD
                 bestReg = testReg;
                 bestCapHead = testStars;
@@ -342,4 +336,15 @@ scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
 scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
 scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
 scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(modelCapIdxs,3))
+end
+
+function [subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, bestCapHead, modelHeadIdxs)
+% GETCAPONHEADPOSITIONS returns x,y,z coordinates of model points
+% containing the positions of the head relative to the cap.
+subX = modelOnCap(:,1);
+subY = modelOnCap(:,2);
+subZ = modelOnCap(:,3);
+subX(modelHeadIdxs) = bestCapHead(:, 1);
+subY(modelHeadIdxs) = bestCapHead(:, 2);
+subZ(modelHeadIdxs) = bestCapHead(:, 3);
 end

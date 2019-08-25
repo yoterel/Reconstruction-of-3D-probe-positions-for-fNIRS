@@ -1,63 +1,32 @@
-function createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, modelOnCapCap, ...
-    modelHeadIdxs, bestCapHead)
-%CREATEPOS ...
-%          outputDir: 
-%      nirsModelPath:
-%   shimadzuFilePath:
-%        modelLabels:
-%      modelOnCapCap:
-%      modelHeadIdxs:
-%        bestCapHead:
-%% create files for spm_fnirs and for Homer2
+function createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, subX, subY, subZ)
+%CREATEPOS Creates a POS file using the coordinates of the cap on the head
+%          outputDir: Direcory for output files 
+%      nirsModelPath: Path of a nirs model file
+%   shimadzuFilePath: Path of a file with shimadzu information
+%        modelLabels: Ordered array of the labels of the model cap's points
+%               subX: x coordinates of the cap on the head
+%               subY: y coordinates of the cap on the head
+%               subZ: z coordinates of the cap on the head
+% use fiber points from resulting model to estimate positions.
+% create files for spm_fnirs and for Homer2
 fprintf("Creating files for spm_fnirs\n");
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
 end
 
 [Ch, Source, Detector] = importChCfgFromShimadzuTXTfile(shimadzuFilePath);
-nChannels = length(Ch);
-nOptodes = length(unique(Source)) + length(unique(Detector));
-subX = modelOnCapCap(:,1);
-subY = modelOnCapCap(:,2);
-subZ = modelOnCapCap(:,3);
-
-subX(modelHeadIdxs) = bestCapHead(:, 1);
-subY(modelHeadIdxs) = bestCapHead(:, 2);
-subZ(modelHeadIdxs) = bestCapHead(:, 3);
-
-refNames = {'nz';'ar';'al';'cz';'iz'};
-fid = fopen(fullfile(outputDir, "digits.txt"), 'w');
-for ref = 1:length(refNames)
-    ind = find(strcmpi(modelLabels, refNames{ref}));
-    fprintf(fid, '%s: %f %f %f\n', refNames{ref}, subX(ind), subY(ind), subZ(ind));
-end
-
 SD.Lambda = [780;805;830];
 SD.nSrcs = length(unique(Source));
 SD.nDets = length(unique(Detector));
 SD.SrcPos = zeros(SD.nSrcs, 3);
 SD.DetPos = zeros(SD.nDets, 3);
-for src = 1:SD.nSrcs
-    ind = find(strcmp(modelLabels,['R',num2str(src)]));
-    SD.SrcPos(src,:) = [subX(ind),subY(ind),subZ(ind)];
-    fprintf(fid, 's%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
-end
-for det = 1:SD.nDets
-    ind = find(strcmp(modelLabels,['T',num2str(det)]));
-    SD.DetPos(det,:) = [subX(ind),subY(ind),subZ(ind)];
-    fprintf(fid, 'd%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
-end
-fclose(fid);
-SD.MeasList = [repmat([Source,Detector],3,1), ones(nChannels*3,1), ...
-    [ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
-SD.MeasListAct = ones(size(SD.MeasList, 1), 1);
-SD.SpatialUnit = 'mm';
-sdFilePath = fullfile(outputDir, "SD.SD");
-save(sdFilePath, 'SD', '-mat')
+createDigitsFile(subX, subY, subZ, modelLabels, SD, outputDir);
+sdFilePath = createSDFile(SD, Ch, Source, Detector, outputDir);
 nirsOutputFilePath = fullfile(outputDir, "nirs_model.nirs");
 Shimadzu2nirsSingleFile(shimadzuFilePath, sdFilePath, nirsOutputFilePath);
 txt2nirs(shimadzuFilePath);
 
+nOptodes = SD.nSrcs + SD.nDets;
 optodePositionsFilePath = exportOptodePositions(nOptodes, modelLabels, subX, subY, subZ, outputDir);
 referencePositionFilePath = exportReferencePosition(modelLabels, subX, subY, subZ, outputDir);
 channelConfigOutputFilePath = exportChannelConfigOutput(Ch, Source, Detector, outputDir);
@@ -68,6 +37,35 @@ runSpmFnirs(referencePositionFilePath, optodePositionsFilePath, channelConfigOut
     nirsModelPath)
 end
 
+function createDigitsFile(subX, subY, subZ, modelLabels, SD, outputDir)
+refNames = {'nz';'ar';'al';'cz';'iz'};
+fid = fopen(fullfile(outputDir, "digits.txt"), 'w');
+for ref = 1:length(refNames)
+    ind = find(strcmpi(modelLabels, refNames{ref}));
+    fprintf(fid, '%s: %f %f %f\n', refNames{ref}, subX(ind), subY(ind), subZ(ind));
+end
+for src = 1:SD.nSrcs
+    ind = find(strcmp(modelLabels,['R',num2str(src)]));
+    SD.SrcPos(src,:) = [subX(ind),subY(ind),subZ(ind)];
+    fprintf(fid, 's%i: %f %f %f\n', src, subX(ind), subY(ind), subZ(ind));
+end
+for det = 1:SD.nDets
+    ind = find(strcmp(modelLabels,['T',num2str(det)]));
+    SD.DetPos(det,:) = [subX(ind),subY(ind),subZ(ind)];
+    fprintf(fid, 'd%i: %f %f %f\n', det, subX(ind), subY(ind), subZ(ind));
+end
+fclose(fid);
+end
+
+function [sdFilePath] = createSDFile(SD, Ch, Source, Detector, outputDir)
+nChannels = length(Ch);
+SD.MeasList = [repmat([Source,Detector],3,1), ones(nChannels*3,1), ...
+    [ones(nChannels,1);2*ones(nChannels,1);3*ones(nChannels,1)]];
+SD.MeasListAct = ones(size(SD.MeasList, 1), 1);
+SD.SpatialUnit = 'mm';
+sdFilePath = fullfile(outputDir, "SD.SD");
+save(sdFilePath, 'SD', '-mat');
+end
 
 function [optodePositionsFilePath] = exportOptodePositions(nOptodes, subName, subX, subY, subZ, ...
     outputDir)
