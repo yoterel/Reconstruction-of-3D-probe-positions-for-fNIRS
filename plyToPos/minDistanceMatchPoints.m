@@ -21,13 +21,13 @@ m = size(targetPoints, 1);
 % inversly proportional to the distance between each pair of points.
 edges = zeros(n * m, 3);
 numEdges = 0;
-for j = 1:n
-    for k = 1:m
-        d = norm(sourcePoints(j, :) - targetPoints(k, :));
+for i = 1:n
+    for j = 1:m
+        d = norm(sourcePoints(i, :) - targetPoints(j, :));
         if (d < maxDistance)
             numEdges = numEdges + 1;
-            edges(numEdges, 1) = j + m;
-            edges(numEdges, 2) = k;
+            edges(numEdges, 1) = i + m;
+            edges(numEdges, 2) = j;
             edges(numEdges, 3) = d * d;
         end
     end

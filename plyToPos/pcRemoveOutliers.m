@@ -6,7 +6,7 @@ if (nargin < 2)
     stdev = 2;
 end
 vertices = pc;
-isPointCloudObj = strcmp(class(pc), 'pointCloud');
+isPointCloudObj = isa(pc, 'pointCloud');
 if (isPointCloudObj)
     vertices = pc.Location;
 end

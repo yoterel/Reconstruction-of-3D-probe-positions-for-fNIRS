@@ -59,13 +59,18 @@ headAndCapIdxs = size(modelMNI, 1)-8:size(modelMNI, 1);
 modelStars = table2array(modelMNI(headAndCapIdxs, 2:4)); % Coordinates of stars on model
 modelStarLabels = modelMNI.labels(headAndCapIdxs); % Ordered labels of stars on model
 [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, missingStars);
-[bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, modelSphereR);
-[capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels);
+[bestRegParams, bestProjStars, bestMate, bestDistance] = ...
+    calculateBestRegParams(existStars, capStars, modelSphereR);
+if bestDistance == inf
+    error("No sufficiently accurate regulation parameters could be found");
+end
+% If successful regulation parameters were found, then bestMate should be
+% the same length as capStars, meaning we labeled all existing stars
+capLabels = existLabels(bestMate);
 plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels);
 
 % rotate model to MNI. Use this rotation for the cap
 capStars = applyRegParams(capStars, bestRegParams, true);
-capStars = capStars(:,1:3);
 
 % reorder capStars and capLabels according to modelLabels
 tempCapStars = capStars;
@@ -93,7 +98,6 @@ modelHead = modelPoints(modelHeadIdxs,:);
 % rotate + scale model to the best aligned result.
 fprintf("Perfroming rotations & scaling\n");
 scaledCap = applyRegParams(capStars.*bestScale, bestReg);
-scaledCap = scaledCap(:,1:3);
 %scaledModel = [modelPoints.*bestScale ones(size(modelPoints,1),1)]*bestReg.M';
 
 % rotate scaled model to match the best to the CAP POINTS ONLY.
@@ -188,8 +192,8 @@ existStars = modelStars(existStarsBitVec, :);
 existLabels = modelStarLabels(existStarsBitVec);
 end
 
-function [bestRegParams, bestProjStars] = calculateBestRegParams(existStars, capStars, ...
-    modelSphereR)
+function [bestRegParams, bestProjStars, bestMate, bestDistance] = calculateBestRegParams(...
+    existStars, capStars, modelSphereR)
 % CALCULATEBESTREGPARAMS Calculates the optimal reg params for adjusting
 %   existing model stars to the cap stars. Returns the parameters and the
 %   adjusted model stars
@@ -211,11 +215,13 @@ m = size(existStars, 1);
 % Two n * 3 matrices containing all possible triplets in 1:n, 1:m
 capTripletOrder = nchoosek(1:n, 3);
 modelTripletOrder = nchoosek(1:m, 3);
-bestD = inf;
+bestDistance = inf;
 fprintf("Processing triplets\n");
 % TODO: maybe there's a way to accelerate this part? Use all cores?
+totalLoopStart = tic;
+minDistanceMatchElapsed = 0;
 for ii = 1:size(modelTripletOrder,1)
-    fprintf("Triplet number %d\n", ii);
+    fprintf("Triplet number %f\n", ii);
     modelTriplet = existStars(modelTripletOrder(ii,:),:);    
     for kk = 1:size(capTripletOrder,1)
         currTriplet = capTripletOrder(kk,:);
@@ -231,7 +237,6 @@ for ii = 1:size(modelTripletOrder,1)
             % and late on the cap).
             % Transform the model stars and project them on the cap
             modelProjStars = applyRegParams(existStars, regParams);
-            modelProjStars = modelProjStars(:,1:3);
 %             modelProjStars = zeros(size(existStars));
 %             for mm = 1:size(existStars,1)
 %                 modelProjStars(mm,:) = tModelStars(mm,:)*capTriplet;
@@ -241,25 +246,39 @@ for ii = 1:size(modelTripletOrder,1)
 %                 dists(dd,:) = sqrt(sqrt(sum((existStars(dd,:)-modelProjStars).^2,2)));
 %             end
 %             [match, cost] = munkres(dists);
-            
+            curStart = tic;
             mate = minDistanceMatchPoints(capStars, modelProjStars, modelSphereR);
+            minDistanceMatchElapsed = minDistanceMatchElapsed + toc(curStart);
             if any(mate < 0) || length(mate) < n
                 % The case where the matching isn't complete (should occur
                 % only if some points are further apart than the sphere's
                 % radius).
                 d = inf;
             else
-                d = sum(sum((capStars - modelProjStars(mate,:)).^2,2));
+                % The error is the sum of squared distances between pairs
+                % of matched points
+                d = sum(sum((capStars - modelProjStars(mate,:)).^2));
             end
 
-            if d < bestD
-                bestD = d;
+            if d < bestDistance
+                bestDistance = d;
                 bestProjStars = modelProjStars;
                 bestRegParams = regParams;
+                bestMate = mate;
             end
         end
     end
 end
+if bestDistance == inf
+    % No successful reg parameters were found, assign placeholder values
+    % for remaining returned variables
+    bestProjStars = [];
+    bestRegParams = {};
+    bestMate = [];
+end
+totalLoopElapsed = toc(totalLoopStart);
+fprintf("Total time spent in loop: %f, total time spent in minDistanceMatchPoints: %f\n", ...
+    totalLoopElapsed, minDistanceMatchElapsed);
 end
 
 function [transformed] = applyRegParams(points, regParams, invert)
@@ -270,19 +289,7 @@ if (nargin > 2 && invert)
     transformationMatrix = transformationMatrix^-1;
 end
 transformed = [points, ones(size(points, 1), 1)] * transformationMatrix;
-end
-
-function [capStars, capLabels] = labelCapStars(capStars, bestProjStars, modelSphereR, existLabels)
-% LABELCAPSTARS Uses bestProjStars to label the cap stars
-fprintf("Applying the calculated regulation parameters\n");
-mate = minDistanceMatchPoints(capStars, bestProjStars, modelSphereR);
-% TODO: is it possible that there are unmatched entries? In such case the
-% error shold be inf and we should probably just stop the script. In
-% general, this function can probably be deleted and we can just return the
-% mate we found in calculateBestRegParams
-capStars(mate < 1,:) = [];
-mate(mate < 1) = [];
-capLabels = existLabels(mate);
+transformed = transformed(:, 1:3);
 end
 
 function [] = plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels)
