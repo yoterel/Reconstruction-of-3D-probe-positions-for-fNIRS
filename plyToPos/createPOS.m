@@ -132,4 +132,3 @@ F{1,1}(3,:) = channelConfigOutputFilePath;
 F{2,1} = nirsModelPath;
 spm_fnirs_spatialpreproc_ui(F);
 end
-

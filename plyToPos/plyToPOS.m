@@ -89,10 +89,10 @@ modelHeadIdxs = ismember(modelLabels, headLabelNames) & existPointsBitVec;
 capLabelNames = {'Front', 'Cz', 'Right', 'Left', 'Pz', 'Iz'};
 capCapIdxs = ismember(capLabels, capLabelNames);
 modelCapIdxs = ismember(modelLabels, capLabelNames) & existPointsBitVec;
-
+capHead = capStars(capHeadIdxs,:);
 modelHead = modelPoints(modelHeadIdxs,:);
-[bestReg, capHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead);
-scaledCapStars = applyRegParams(capStars.*bestScale, bestReg);
+[bestReg, capHead, bestScale] = findHeadTransformation(capHead, modelHead);
+capStars = applyRegParams(capStars.*bestScale, bestReg);
 %scaledModel = [modelPoints.*bestScale ones(size(modelPoints,1),1)]*bestReg.M';
 
 % rotate scaled model to match the best to the CAP POINTS ONLY.
@@ -106,7 +106,7 @@ for i = 1:size(modelCapLabels,1)
     end
 end
 modelCap(modelStarsToErase,:) = [];
-capCap = scaledCapStars(capCapIdxs,:);
+capCap = capStars(capCapIdxs,:);
 [modelReg, ~] = absor(modelCap',capCap');
 modelOnCap = applyRegParams(modelPoints, modelReg);
 
@@ -136,13 +136,15 @@ function [labels] = divideStickerCandidatesIntoClouds(candidates, modelSphereR, 
 %   each sticker
 distMatrix = zeros(length(candidates));
 for v = 1:length(candidates)
-    distMatrix(:,v) = sqrt(sum([candidates(:,1)-candidates(v,1) candidates(:,2)-candidates(v,2) candidates(:,3)-candidates(v,3)].^2,2));
+    distMatrix(:,v) = sqrt(sum((candidates - candidates(v,:)).^2,2));
 end
+
 % Initialize a binary matrix representing a graph where each two points
 % close enough to be on the same sticker are connected
 adjMatrix = zeros(length(candidates));
 maxStickerLength = modelSphereR / radiusToStickerRatio;
 adjMatrix(distMatrix < maxStickerLength) = 1;
+
 % Labels is a column vector containing a connected component id for each candidate vertex
 [labels, ~] = graphConnectedComponents(adjMatrix);
 end
@@ -293,30 +295,29 @@ plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
 text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
 end
 
-function [bestReg, bestCapHead, bestScale] = findOptimalScaling(capStars, capHeadIdxs, modelHead)
-% FINDOPTIMALSCALING Finds the best scaling parameters for fitting the
-%   current cap stars to the model head
+function [bestReg, transformedCapHead, bestScale] = findHeadTransformation(capHead, modelHead)
+% FINDOPTIMALSCALING Finds the best scaling, rotation and translation parameters for fitting the
+%   current cap head stars to the model stars
 % Perform grid search of axis-aligned scaling, using only the head points,
 % and realign at each step.
 fprintf("Finding optimal scaling parameters\n");
-capHead = capStars(capHeadIdxs,:);
 scalespace = logspace(log10(0.5),log10(2),20);
 bestD = inf;
 for scX = scalespace
     for scY = scalespace
         for scZ = scalespace
-            testStars = capHead.*[scX,scY,scZ]; % implicit expansion
-            testReg = absor(testStars', modelHead');
-            testStars = applyRegParams(testStars, testReg);
-            testStars = testStars(:,1:3);
+            testCapHead = capHead.*[scX,scY,scZ]; % implicit expansion
+            testReg = absor(testCapHead', modelHead');
+            testCapHead = applyRegParams(testCapHead, testReg);
+            testCapHead = testCapHead(:,1:3);
             % TODO: maybe not needed, need to use the labels
-            [~,d] = knnsearch(modelHead, testStars); 
+            [~,d] = knnsearch(modelHead, testCapHead); 
             %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
             %if ( cost < bestD )
             cost = sum(d.^2);
             if cost < bestD
                 bestReg = testReg;
-                bestCapHead = testStars;
+                transformedCapHead = testCapHead;
                 bestScale = [scX,scY,scZ];
                 bestD = cost;
             end
@@ -340,7 +341,8 @@ end
 
 function [subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, bestCapHead, modelHeadIdxs)
 % GETCAPONHEADPOSITIONS returns x,y,z coordinates of model points
-% containing the positions of the head relative to the cap.
+% where the coordinates of the points on the head in the model were
+% replaced with the actual positions of the head relative to the cap
 subX = modelOnCap(:,1);
 subY = modelOnCap(:,2);
 subZ = modelOnCap(:,3);
