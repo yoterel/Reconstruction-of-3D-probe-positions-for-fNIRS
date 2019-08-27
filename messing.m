@@ -4,49 +4,39 @@ poissonReconToolPath = "C:\TEMP\PoissonRecon.exe";
 global resultsDir;
 global vidPlyPath;
 global cleanedVidPlyPath;
+global reconstructedPlyPath;
 resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
 vidPlyPath = fullfile(resultsDir, "dense.0.ply");
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
+reconstructedPlyPath = fullfile(resultsDir, "reconstructed.ply");
 
-outputPath = fullfile(resultsDir, "reconstructed.ply");
-mesh = poissonRecon(poissonReconToolPath, cleanedVidPlyPath, outputPath);
-load("C:\TEMP\workspace.mat", 'modelMesh', 'capPc', 'registered');
-hold on;
-registeredPc = pointCloud(registered, 'Color', mesh.Color);
-pcshow(registeredPc);
-vM = verticesArr(modelMesh);
-fM = facesArr(modelMesh);
-trimesh(fM, vM(:, 1), vM(:, 2), vM(:, 3));
-
-
+function nonrigidICPDemo(reconstructedPlyPath)
 log("Reading model files");
 modelMesh = plyread("C:\TEMP\SagiFirstCutReconPoisson2.ply");
 vM = verticesArr(modelMesh);
 fM = facesArr(modelMesh);
-%trimesh(fM, pc2(:, 1), pc2(:, 2), pc2(:, 3));
 
 log("Simplifying mesh");
-[rf2, rv2] = reducepatch(fM, vM, 2000);
-%figure;
-trimesh(rf2, rv2(:, 1), rv2(:, 2), rv2(:, 3));
+[rfM, rvM] = reducepatch(fM, vM, 2000);
 
-log("Loading cap mesh and pc");
-capPc = plyread("C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply");
-capMesh = plyread("C:\GIT\CapNet\results\adult14_stride_5\reconstructedFromClean.ply");
+log("Loading cap mesh");
+capMesh = plyread(reconstructedPlyPath);
+
+log("Scaling and translating cap");
+vC = verticesArr(capMesh);
+[vC, ~, ~] = sphereScaleAndTranslate(rvM, vC);
 
 log("Running icp");
-registered = nonrigidICPv1(vM, verticesArr(capMesh), fM, facesArr(capMesh), 10, 1);
-save("C:\TEMP\workspace.mat", 'modelMesh', 'capPc', 'capMesh', 'registered');
+registered = nonrigidICPv1(rvM, vC, rfM, facesArr(capMesh), 10, 1);
+save("C:\TEMP\NonRigidICPDemo1.mat", 'rvM', 'vC', 'rfM', 'capMesh', 'registered');
 
-[scaledPc1, ~, ~] = sphereScaleAndTranslate(pc2, pc1);
-hold on;
-pcshow(pc1, 'r');
-pcshow(pc2, 'b');
-pcshow(scaledPc1, 'g');
-log("Running ICP");
-registered = nonrigidICPv1(... 
-    verticesArr(capMesh), verticesArr(modelMesh), facesArr(capMesh), facesArr(modelMesh), 10 ,1);
-a = 5;
+% load("C:\TEMP\NonRigidICPDemo1.mat", 'rvM', 'vC', 'rfM', 'capMesh', 'registered');
+% hold on;
+% registeredPc = pointCloud(registered, 'Color', ...
+%     [capMesh.vertex.red, capMesh.vertex.green, capMesh.vertex.blue]/255);
+% pcshow(registeredPc);
+% plotMesh(rfM, rvM);
+end
 
 function convertStructToPcDemo()
 pc = plyread(vidPlyPath);
@@ -60,7 +50,6 @@ load("C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat", 'modelMN
 scatter3(modelMNI.X, modelMNI.Y, modelMNI.Z);
 asPc = pointCloud([modelMNI.X, modelMNI.Y, modelMNI.Z]);
 pcwrite(asPc, "C:\TEMP\modelMNI.ply", 'PLYFormat', 'binary');
-mesh = poissonRecon("C:\TEMP\PoissonRecon.exe", "C:\TEMP\modelMNI.ply", "C:\TEMP\modelMNIRecon.ply");
 end
 
 function builtInICPDemo()
@@ -81,6 +70,13 @@ function createCleanedPly()
 pc = structToPointCloud(plyread(vidPlyPath));
 cleaned = pcRemoveOutliers(pc);
 pcwrite(cleaned, cleanedVidPlyPath, 'PLYFormat', 'binary');
+end
+
+function [ax] = plotMesh(faces, vertices, color)
+if nargin == 2
+    color = [0.5, 0.5, 0.5];
+end
+ax = patch('Faces', faces, 'Vertices', vertices, 'FaceColor', color, 'LineWidth', 0.01);
 end
 
 function plotColoredPc(pcStruct)
