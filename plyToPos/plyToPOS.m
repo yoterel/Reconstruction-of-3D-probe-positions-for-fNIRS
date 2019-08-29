@@ -30,7 +30,8 @@ fprintf("Loaded MNI model\n");
 % Use spherical approximations for the model & cap, use them to scale and translate the sticker
 % candidate vertices on the cap (one can scale modelStars instead, as done before in a comment)
 modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
-[candidates, ~, modelSphereR] = sphereScaleAndTranslate(modelPoints, candidates);
+[~, modelSphereR, scale, translate] = sphereScaleAndTranslate(modelPoints, candidates);
+candidates = candidates * scale + translate;
 fprintf("Used approximating spheres to scale and translate candidate sticker points\n");
 capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize);

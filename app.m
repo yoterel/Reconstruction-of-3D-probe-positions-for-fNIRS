@@ -91,6 +91,7 @@ radiusToStickerRatio = 8;
 spmPath = "C:\Users\Dean\Documents\MATLAB\spm12";
 spmFNIRSPath = "C:\Users\Dean\Documents\MATLAB\spm_fnirs";
 capNetModelPath = fullfile('capnet', filesep, 'model.mat');
+modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
 
 % Name of nvm file outputed by VSFM
 vsfmOutputFileName = "dense"; 
@@ -125,7 +126,28 @@ setStatusText(handles, "Converting .ply file to .pos file");
 %plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
 %    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio);
 
-candidates = getStickerCandidates(handles, plyFilePath, stickerHSV);
+setStatusText(handles, "Reading generated ply file");
+pc = structToPointCloud(plyRead(plyFilePath));
+setStatusText(handles, "Reading model mesh");
+modelMesh = plyRead(modelMeshPath);
+
+pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
+[~, ~, scale, translate] = sphereScaleAndTranslate(verticesArr(modelMesh), pc.Location);
+pc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
+
+%candidates = getStickerCandidates(handles, plyFilePath, stickerHSV);
+end
+
+function [faces] = facesArr(plyMesh)
+faces = cell2mat(plyMesh.face.vertex_indices) + 1;
+end
+
+function [vertices] = verticesArr(plyMesh)
+vertices = [plyMesh.vertex.x, plyMesh.vertex.y, plyMesh.vertex.z];
+end
+
+function [normals] = normalsArr(plyMesh)
+normals = [plyMesh.vertex.nx, plyMesh.vertex.ny, plyMesh.vertex.nz];
 end
 
 % --- If Enable == 'on', executes on mouse press in 5 pixel border.

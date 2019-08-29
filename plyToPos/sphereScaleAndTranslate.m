@@ -1,4 +1,4 @@
-function [transformedPc, sourceC, sourceR] = sphereScaleAndTranslate(sourcePc, targetPc)
+function [sourceC, sourceR, scale, translate] = sphereScaleAndTranslate(sourcePc, targetPc)
 %SPHERESCALEANDTRANSLATE Scales and translates a target point cloud to
 %match a source point cloud, based on spherical models of the two.
 %   INPUT:
@@ -14,7 +14,6 @@ function [transformedPc, sourceC, sourceR] = sphereScaleAndTranslate(sourcePc, t
 %                      point cloud
 [sourceC, sourceR] = sphereFit(sourcePc);
 [targetC, targetR] = sphereFit(targetPc);
-relativeR = sourceR / targetR;
-relativeC = sourceC - targetC;
-transformedPc = targetPc * relativeR + relativeC;
+scale = sourceR / targetR;
+translate = sourceC - targetC;
 end
