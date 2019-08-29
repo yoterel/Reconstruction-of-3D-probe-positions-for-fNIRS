@@ -1,14 +1,20 @@
 addpath("nonrigidICP");
 addpath("plyToPos");
 poissonReconToolPath = "C:\TEMP\PoissonRecon.exe";
-global resultsDir;
-global vidPlyPath;
-global cleanedVidPlyPath;
-global reconstructedPlyPath;
 resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
 vidPlyPath = fullfile(resultsDir, "dense.0.ply");
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
-reconstructedPlyPath = fullfile(resultsDir, "reconstructed.ply");
+reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
+
+function plyOnModelDemo(cleanedVidPlyPath, reconstructedPlyPath)
+hold on;
+pc = pcread(cleanedVidPlyPath);
+pcshow(pc);
+camlight('headlight')
+mesh = plyread(reconstructedPlyPath);
+[rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
+plotMesh(rfM, rvM);
+end
 
 function nonrigidICPDemo(reconstructedPlyPath)
 log("Reading model files");
@@ -72,11 +78,28 @@ cleaned = pcRemoveOutliers(pc);
 pcwrite(cleaned, cleanedVidPlyPath, 'PLYFormat', 'binary');
 end
 
-function [ax] = plotMesh(faces, vertices, color)
-if nargin == 2
-    color = [0.5, 0.5, 0.5];
+function [p] = plotMesh(varargin)
+%PLOTMESH
+%   PLOTMESH(mesh)
+%   PLOTMESH(faces, vertices)
+%   PLOTMESH(faces, vertices, color)
+if nargin <= 2
+    color = [0.95, 0.95, 0.95];
 end
-ax = patch('Faces', faces, 'Vertices', vertices, 'FaceColor', color, 'LineWidth', 0.01);
+if nargin == 1
+    mesh = varargin{1};
+    faces = facesArr(mesh);
+    vertices = verticesArr(mesh);
+    normals = normalsArr(mesh);
+else
+    faces = varargin{1};
+    vertices = varargin{2};
+end
+p = patch('Faces', faces, 'Vertices', vertices, 'EdgeColor', 'none', ...
+    'FaceColor', color, 'FaceLighting', 'gouraud');
+if nargin == 1
+    p.VertexNormals = normals;
+end
 end
 
 function plotColoredPc(pcStruct)
@@ -109,6 +132,10 @@ end
 
 function [vertices] = verticesArr(plyMesh)
 vertices = [plyMesh.vertex.x, plyMesh.vertex.y, plyMesh.vertex.z];
+end
+
+function [normals] = normalsArr(plyMesh)
+normals = [plyMesh.vertex.nx, plyMesh.vertex.ny, plyMesh.vertex.nz];
 end
 
 function [mesh] = poissonRecon(toolPath, inputPlyPath, outputPlyPath, convertColors, samplesPerNode)
