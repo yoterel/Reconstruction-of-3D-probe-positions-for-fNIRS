@@ -130,12 +130,43 @@ setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyRead(plyFilePath));
 setStatusText(handles, "Reading model mesh");
 modelMesh = plyRead(modelMeshPath);
+modelPc = structToPointCloud(modelMesh);
 
 pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
 [~, ~, scale, translate] = sphereScaleAndTranslate(verticesArr(modelMesh), pc.Location);
 pc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
 
-%candidates = getStickerCandidates(handles, plyFilePath, stickerHSV);
+% TODO: add y/z axis rotations? can use roty, rotz. Can add
+% getRotationMatrix with 3 angles as helper. 
+
+% Try ICP several times with different initial rotations of the sphere to
+% try to avoid local minima problems
+numRotations = 4;
+[~, bestTformedPc, bestRmse] = pcregistericp(pc, modelPc);
+for i = 1:(numRotations - 1)
+    rotationTform = getTransformationMatrix(1, zeros(1, 3), rotx(i * 360 / numRotations));
+    tmpPc = pctransform(pc, affine3d(rotationTform));
+    [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
+    if rmse < bestRmse
+        bestTformedPc = tformedPc;
+        bestRmse = rmse;
+    end
+end
+pc = bestTformedPc;
+
+function my_callback(hObject, eventdata)
+  clickedPt = get(gca,'CurrentPoint');
+  msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
+      clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
+      clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
+  set(handles.pos, 'String', msg);
+  if (isfield(handles, 'clicked_pt'))
+    delete(handles.clicked_pt);
+  end
+  handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
+end
+
+candidates = getStickerCandidates(plyFilePath, stickerHSV);
 end
 
 function [faces] = facesArr(plyMesh)

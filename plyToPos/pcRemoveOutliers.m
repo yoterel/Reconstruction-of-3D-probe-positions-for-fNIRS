@@ -16,20 +16,8 @@ distances = sqrt(sum((vertices - centerOfMass).^2, 2));
 normalized = normalize(distances);
 mask = abs(normalized) < stdev;
 if (isPointCloudObj)
-    vertices = returnFilteredArr(vertices, mask, n);
-    colors = returnFilteredArr(pc.Color, mask, n);
-    normals = returnFilteredArr(pc.Normal, mask, n);
-    intensities = returnFilteredArr(pc.Intensity, mask, n);
-    cleanedPc = pointCloud(vertices, 'Color', colors, 'Normal', normals, 'Intensity', intensities);
+    cleanedPc = filterPcPoints(pc, mask);
 else
     cleanedPc = pc(mask, :);
-end
-end
-
-function [filtered] = returnFilteredArr(arr, mask, n)
-if (size(arr, 1) == n)
-    filtered = arr(mask, :);
-else
-    filtered = [];
 end
 end

@@ -61,17 +61,17 @@ sinc = sin(r)./r;
 handles.sinc = sinc;
 % Set the current data value.
 handles.current_data = handles.peaks;
-  function my_callback(hObject, eventdata)
-      clickedPt = get(gca,'CurrentPoint');
-      msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
-          clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
-          clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
-      set(handles.pos, 'String', msg);
-      if (isfield(handles, 'clicked_pt'))
-        delete(handles.clicked_pt);
-      end
-      handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
+function my_callback(hObject, eventdata)
+  clickedPt = get(gca,'CurrentPoint');
+  msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
+      clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
+      clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
+  set(handles.pos, 'String', msg);
+  if (isfield(handles, 'clicked_pt'))
+    delete(handles.clicked_pt);
   end
+  handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
+end
 set(surf(handles.current_data), 'ButtonDownFcn', @my_callback);
 hold on;
 

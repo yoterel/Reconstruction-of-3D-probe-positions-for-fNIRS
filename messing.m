@@ -63,13 +63,13 @@ vidPath = "C:\TEMP\denseNet.0.ply";
 modelPath = "C:\TEMP\SagiFirstCut.ply";
 vidPc = pcread(vidPath);
 modelPc = pcread(modelPath);
-pcshow(vidPc);
-figure;
-hold on;
-pcshow([modelPc.Location(:,1), modelPc.Location(:,2), modelPc.Location(:,3)], 'r');
-tform = pcregistericp(vidPc, modelPc);
+%pcshow(vidPc);
+%figure;
+%hold on;
+pcshow(modelPc.Location, 'r');
+[tform, ~, rmse] = pcregistericp(vidPc, modelPc);
 tformedPc = pctransform(vidPc, tform);
-pcshow([tformedPc.Location(:,1), tformedPc.Location(:,2), tformedPc.Location(:,3)], 'b');
+pcshow(tformedPc.Location, 'b');
 end
 
 function createCleanedPly()
@@ -108,13 +108,6 @@ colors = [v.diffuse_red, v.diffuse_green, v.diffuse_blue];
 scatter3(v.x, v.y, v.z, 1, colors);
 end
 
-function [pc] = structToPointCloud(pcStruct)
-v = pcStruct.vertex;
-colors = [v.diffuse_red, v.diffuse_green, v.diffuse_blue];
-normals = [v.nx, v.ny, v.nz];
-pc = pointCloud([v.x, v.y, v.z], 'Color', colors/255, 'Normal', normals);
-end
-
 function pcRemoveOutliersDemo()
 pc = verticesArr(plyread("C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply"));
 pcshow(pc);
@@ -150,7 +143,7 @@ end
 if nargin < 5
     samplesPerNode = 5;
 end
-system(sprintf("%s --in %s --out %s --colors --samplesPerNode %d", ...
+system(sprintf("%s --in %s --out %s --colors --samplesPerNode %d --normals", ...
     toolPath, inputPlyPath, outputPlyPath, samplesPerNode));
 mesh = plyread(outputPlyPath);
 end

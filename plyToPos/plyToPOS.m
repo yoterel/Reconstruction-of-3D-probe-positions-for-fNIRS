@@ -17,8 +17,7 @@ fprintf("Reading ply file\n");
 mesh = plyread(plyFilePath);
 fprintf("Finished reading ply file, finding sticker candidate points\n");
 
-vertices = [mesh.vertex.x mesh.vertex.y mesh.vertex.z];
-candidates = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV);
+candidates = getAndPlotStickerCandidatePoints(mesh, stickerHSV);
 fprintf("Calculated sticker candidate points\n");
 
 %load(['model',filesep,'modelStars.mat']); %load modelStars, modelLabels, modelSphereC,modelSphereR
@@ -118,14 +117,12 @@ createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, subX, subY, s
 close all
 end
 
-function [candidates] = getAndPlotStickerCandidatePoints(mesh, vertices, stickerHSV)
+function [candidates] = getAndPlotStickerCandidatePoints(mesh, stickerHSV)
 % GETANDPLOTSTICKERCANDIDATEPOINTS Find coordinates of points in the ply whose hue is close to the
 %   given stickers' hue
-verColors = [mesh.vertex.diffuse_red mesh.vertex.diffuse_green mesh.vertex.diffuse_blue];
-verColorsHSV = rgb2hsv(double(verColors)/255);
-trgHue = stickerHSV(1);
-candidates = vertices(abs(verColorsHSV(:,1)-trgHue) < 0.15 & ... 
-    ((verColorsHSV(:,2) > 0.2 & verColorsHSV(:,3) > 0.2) | (verColorsHSV(:,2) > 0.3 & verColorsHSV(:,3) > 0.1)), :);
+pc = structToPointCloud(mesh);
+candidatesPc = getStickerCandidates(pc, stickerHSV);
+candidates = candidatesPc.Location;
 fprintf("Found sticker candidate vertices\n");
 % Plot the candidates
 plot3(candidates(:,1), candidates(:,2), candidates(:,3), '.');
