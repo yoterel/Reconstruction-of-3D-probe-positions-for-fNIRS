@@ -74,28 +74,79 @@ function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
 varargout{1} = handles.output;
 end
 
-function pc_on_model_demo()
+function pc_on_model_demo(handles)
+addpath('TriangleRayIntersection');
+
 resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
 reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
 hold on;
 pc = pcread(cleanedVidPlyPath);
 pcshow(pc);
-camlight('headlight')
+camlight('headlight');
 mesh = plyread(reconstructedPlyPath);
 [rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
-plotMesh(rfM, rvM);
+vert1 = rvM(rfM(:,1),:);
+vert2 = rvM(rfM(:,2),:);
+vert3 = rvM(rfM(:,3),:);
+
+function selectPointOnMesh(~, ~)
+    hold on;
+    clickedPt = get(gca,'CurrentPoint');
+    msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
+        clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
+        clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
+    setStatusText(handles, msg);
+    
+    if (isfield(handles, 'front_pt'))
+        delete(handles.front_pt);
+    end
+    handles.front_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
+    
+    if (isfield(handles, 'back_pt'))
+        delete(handles.back_pt);
+    end
+    handles.back_pt = scatter3(clickedPt(2,1), clickedPt(2,2), clickedPt(2,3), 'filled', 'b');
+    
+    orig = clickedPt(1,:);
+    dir = clickedPt(2,:) - orig;
+    
+    if isfield(handles, 'line')
+        delete(handles.line);
+    end
+    handles.line = line('XData' ,orig(1)+[0 dir(1)], 'YData', orig(2)+[0 dir(2)], 'ZData', ...
+        orig(3)+[0 dir(3)], 'Color', 'r', 'LineWidth', 3);
+    
+    [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
+        orig, dir, vert1, vert2, vert3);
+    if (isfield(handles, 'intersection'))
+        delete(handles.intersection);
+    end
+    intersections = intersections(intersectionsMask, :);
+    if size(intersections, 1) >= 1
+        intersection = intersections(1, :);
+        handles.intersection = scatter3(...
+            intersection(1), intersection(2), intersection(3), 'filled', 'g');
+    end
+end
+
+meshPlot = plotMesh(rfM, rvM);
+set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
 drawnow;
 end
 
 % --- Executes on button press in start_btn.
 function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
-set(handles.start_btn, 'Enable', 'off');
-drawnow;
-
 % hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+set(handles.start_btn, 'Enable', 'off');
+drawnow;
+
+% pc_on_model_demo(handles);
+% end
+% function foo(hObject, eventdata, handles)
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);

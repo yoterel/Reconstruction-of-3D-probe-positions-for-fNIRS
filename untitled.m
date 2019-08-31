@@ -67,10 +67,16 @@ function my_callback(hObject, eventdata)
       clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
       clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
   set(handles.pos, 'String', msg);
+  
   if (isfield(handles, 'clicked_pt'))
     delete(handles.clicked_pt);
   end
-  handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
+  handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
+  
+  if (isfield(handles, 'back_pt'))
+    delete(handles.back_pt);
+  end
+  handles.back_pt = scatter3(clickedPt(2,1), clickedPt(2,2), clickedPt(2,3), 'filled', 'g');
 end
 set(surf(handles.current_data), 'ButtonDownFcn', @my_callback);
 hold on;

@@ -10,7 +10,7 @@ function plyOnModelDemo(cleanedVidPlyPath, reconstructedPlyPath)
 hold on;
 pc = pcread(cleanedVidPlyPath);
 pcshow(pc);
-camlight('headlight')
+camlight('headlight');
 mesh = plyread(reconstructedPlyPath);
 [rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
 plotMesh(rfM, rvM);
