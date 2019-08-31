@@ -74,9 +74,25 @@ function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
 varargout{1} = handles.output;
 end
 
+function pc_on_model_demo()
+resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
+cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
+reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
+hold on;
+pc = pcread(cleanedVidPlyPath);
+pcshow(pc);
+camlight('headlight')
+mesh = plyread(reconstructedPlyPath);
+[rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
+plotMesh(rfM, rvM);
+drawnow;
+end
 
 % --- Executes on button press in start_btn.
 function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
+set(handles.start_btn, 'Enable', 'off');
+drawnow;
+
 % hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -127,15 +143,19 @@ setStatusText(handles, "Converting .ply file to .pos file");
 %    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio);
 
 setStatusText(handles, "Reading generated ply file");
-pc = structToPointCloud(plyRead(plyFilePath));
+pc = structToPointCloud(plyread(plyFilePath));
 setStatusText(handles, "Reading model mesh");
-modelMesh = plyRead(modelMeshPath);
-modelPc = structToPointCloud(modelMesh);
+modelMesh = plyread(modelMeshPath);
+vM = verticesArr(modelMesh);
+fM = facesArr(modelMesh);
+modelPc = structToPointCloud(modelMesh, false);
 
+setStatusText(handles, "Initial adjustments of point cloud to mesh");
 pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
-[~, ~, scale, translate] = sphereScaleAndTranslate(verticesArr(modelMesh), pc.Location);
+[~, ~, scale, translate] = sphereScaleAndTranslate(vM, pc.Location);
 pc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
 
+setStatusText(handles, "Running ICP with different starting conditions");
 % TODO: add y/z axis rotations? can use roty, rotz. Can add
 % getRotationMatrix with 3 angles as helper. 
 
@@ -154,19 +174,29 @@ for i = 1:(numRotations - 1)
 end
 pc = bestTformedPc;
 
-function my_callback(hObject, eventdata)
-  clickedPt = get(gca,'CurrentPoint');
-  msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
-      clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
-      clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
-  set(handles.pos, 'String', msg);
-  if (isfield(handles, 'clicked_pt'))
-    delete(handles.clicked_pt);
-  end
-  handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ,'filled', 'r');
+setStatusText(handles, "Matched video ply with model, calculating existing sticker positions");
+candidates = getStickerCandidates(pc, stickerHSV);
+
+function selectPointOnMesh(~, ~)
+    hold on;
+    clickedPt = get(gca,'CurrentPoint');
+    msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
+        clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
+        clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
+    setStatusText(handles, msg);
+    if (isfield(handles, 'clicked_pt'))
+        delete(handles.clicked_pt);
+    end
+    handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
 end
 
-candidates = getStickerCandidates(plyFilePath, stickerHSV);
+hold on;
+pcshow(pc);
+camlight('headlight');
+[rfM, rvM] = reducepatch(fM, vM, 5000);
+meshPlot = plotMesh(rfM, rvM);
+set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
+
 end
 
 function [faces] = facesArr(plyMesh)
@@ -179,6 +209,30 @@ end
 
 function [normals] = normalsArr(plyMesh)
 normals = [plyMesh.vertex.nx, plyMesh.vertex.ny, plyMesh.vertex.nz];
+end
+
+function [p] = plotMesh(varargin)
+%PLOTMESH
+%   PLOTMESH(mesh)
+%   PLOTMESH(faces, vertices)
+%   PLOTMESH(faces, vertices, color)
+if nargin <= 2
+    color = [0.95, 0.95, 0.95];
+end
+if nargin == 1
+    mesh = varargin{1};
+    faces = facesArr(mesh);
+    vertices = verticesArr(mesh);
+    normals = normalsArr(mesh);
+else
+    faces = varargin{1};
+    vertices = varargin{2};
+end
+p = patch('Faces', faces, 'Vertices', vertices, 'EdgeColor', 'none', ...
+    'FaceColor', color, 'FaceLighting', 'gouraud');
+if nargin == 1
+    p.VertexNormals = normals;
+end
 end
 
 % --- If Enable == 'on', executes on mouse press in 5 pixel border.
