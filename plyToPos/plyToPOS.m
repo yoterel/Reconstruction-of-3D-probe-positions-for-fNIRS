@@ -32,8 +32,13 @@ modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z];
 [~, modelSphereR, scale, translate] = sphereScaleAndTranslate(modelPoints, candidates);
 candidates = candidates * scale + translate;
 fprintf("Used approximating spheres to scale and translate candidate sticker points\n");
-capStars = calculateCapStickerPositions(candidates, modelSphereR, radiusToStickerRatio, ...
-    stickerMinGroupSize);
+
+% Approximates cap sticker positions using distance based clustering, plot
+% clusters
+figure; axis equal; hold on;
+capStars = getClosePointClusterCenters(candidates, modelSphereR / radiusToStickerRatio, ...
+    stickerMinGroupSize, true);
+fprintf("Calculated approximate sticker positions\n");
 
 %% Add the manually added points
 %capStars = [capStars; [-7.888 3.4265 -2.053]*modelSphereR/capSphereR+modelSphereC-capSphereC];
@@ -128,50 +133,6 @@ fprintf("Found sticker candidate vertices\n");
 plot3(candidates(:,1), candidates(:,2), candidates(:,3), '.');
 end
 
-function [labels] = divideStickerCandidatesIntoClouds(candidates, modelSphereR, radiusToStickerRatio)
-% DIVIDESTICKERCANDIDATESINTOCLOUD Groups the sticker candidate points into
-%   point clouds, and returns a label column vector specifying the cloud id for
-%   each sticker
-distMatrix = zeros(length(candidates));
-for v = 1:length(candidates)
-    distMatrix(:,v) = sqrt(sum((candidates - candidates(v,:)).^2,2));
-end
-
-% Initialize a binary matrix representing a graph where each two points
-% close enough to be on the same sticker are connected
-adjMatrix = zeros(length(candidates));
-maxStickerLength = modelSphereR / radiusToStickerRatio;
-adjMatrix(distMatrix < maxStickerLength) = 1;
-
-% Labels is a column vector containing a connected component id for each candidate vertex
-[labels, ~] = graphConnectedComponents(adjMatrix);
-end
-
-function [capStars] = calculateCapStickerPositions(candidates, modelSphereR, ...
-    radiusToStickerRatio, stickerMinGroupSize)
-% CALCULATECAPSTICKERPOSITIONS Approximates cap sticker positions using the
-%   candidate sticker points
-labels = divideStickerCandidatesIntoClouds(candidates, modelSphereR, radiusToStickerRatio);
-capStars = convertPointCloudsIntoPositions(candidates, labels, stickerMinGroupSize);
-fprintf("Calculated approximate sticker positions\n");
-end
-
-function [capStars] = convertPointCloudsIntoPositions(candidates, labels, stickerMinGroupSize)
-% CONVERTPOINTCLOUDSINTOPOSITIONS Converts the grouped candidate points
-%   into individual sticker positions
-figure; axis equal; hold on
-numConnectedComponents = max(labels);
-counter = zeros(numConnectedComponents, 1);
-mids = zeros(numConnectedComponents, 3);
-for i = 1:numConnectedComponents
-    relevantCandidates = candidates(labels == i,:);
-    scatter3(relevantCandidates(:,1), relevantCandidates(:,2), relevantCandidates(:,3));
-    counter(i) = size(relevantCandidates, 1);
-    mids(i,:) = sum(relevantCandidates, 1)./counter(i);
-end
-% Throw away stickers that are too small
-capStars = mids(counter > stickerMinGroupSize,:); 
-end
 
 function [existStars, existLabels] = findExistingStarsAndLabels(modelStarLabels, modelStars, ...
     missingStars)

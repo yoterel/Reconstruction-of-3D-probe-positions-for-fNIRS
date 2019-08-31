@@ -203,7 +203,7 @@ modelPc = structToPointCloud(modelMesh, false);
 
 setStatusText(handles, "Initial adjustments of point cloud to mesh");
 pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
-[~, ~, scale, translate] = sphereScaleAndTranslate(vM, pc.Location);
+[~, modelSphereR, scale, translate] = sphereScaleAndTranslate(vM, pc.Location);
 pc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
 
 setStatusText(handles, "Running ICP with different starting conditions");
@@ -224,27 +224,38 @@ for i = 1:(numRotations - 1)
     end
 end
 pc = bestTformedPc;
+hold on;
+pcshow(pc);
 
 setStatusText(handles, "Matched video ply with model, calculating existing sticker positions");
 candidates = getStickerCandidates(pc, stickerHSV);
+capStars = getClosePointClusterCenters(candidates, modelSphereR / radiusToStickerRatio, ...
+    stickerMinGroupSize, false);
+scatter3(capStars(1, :), capStars(2, :), capStars(3, 0), 'filled', 'g');
 
+numStarsToSelect = 9 - size(capStars, 1);
+[rfM, rvM] = reducepatch(fM, vM, 5000);
+vert1 = rvM(rfM(:,1),:);
+vert2 = rvM(rfM(:,2),:);
+vert3 = rvM(rfM(:,3),:);
 function selectPointOnMesh(~, ~)
     hold on;
-    clickedPt = get(gca,'CurrentPoint');
-    msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
-        clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
-        clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
-    setStatusText(handles, msg);
-    if (isfield(handles, 'clicked_pt'))
-        delete(handles.clicked_pt);
+    curPointMat = get(gca,'CurrentPoint');
+    orig = curPointMat(1,:);
+    direction = curPointMat(2,:) - orig;
+    [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
+        orig, direction, vert1, vert2, vert3);
+    if (isfield(handles, 'ptOnModelPlot'))
+        delete(handles.ptOnModelPlot);
     end
-    handles.clicked_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
+    intersections = intersections(intersectionsMask, :);
+    if size(intersections, 1) >= 1
+        ptOnModel = intersections(1, :);
+        handles.ptOnModelPlot = scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'r');
+        handles.ptOnModel = ptOnModel;
+    end
 end
-
-hold on;
-pcshow(pc);
 camlight('headlight');
-[rfM, rvM] = reducepatch(fM, vM, 5000);
 meshPlot = plotMesh(rfM, rvM);
 set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
 
