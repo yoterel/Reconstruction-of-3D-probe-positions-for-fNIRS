@@ -6,6 +6,13 @@ vidPlyPath = fullfile(resultsDir, "dense.0.ply");
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
 reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
 
+function scatterVsPCShowDemo()
+hold on;
+points = [1,1,1;2,2,2;3,3,3;4,4,4];
+pcshow(points, [0,1,0], 'MarkerSize', 40);
+scatter3(points(1,:), points(2,:), points(3,:), 'filled', 'b');
+end
+
 function plyOnModelDemo(cleanedVidPlyPath, reconstructedPlyPath)
 hold on;
 pc = pcread(cleanedVidPlyPath);

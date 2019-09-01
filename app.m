@@ -22,7 +22,7 @@ function varargout = app(varargin)
 
 % Edit the above text to modify the response to help app
 
-% Last Modified by GUIDE v2.5 10-Aug-2019 12:38:42
+% Last Modified by GUIDE v2.5 01-Sep-2019 11:16:39
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -229,51 +229,69 @@ pcshow(pc);
 
 setStatusText(handles, "Matched video ply with model, calculating existing sticker positions");
 candidates = getStickerCandidates(pc, stickerHSV);
-capStars = getClosePointClusterCenters(candidates, modelSphereR / radiusToStickerRatio, ...
-    stickerMinGroupSize, false);
-scatter3(capStars(1, :), capStars(2, :), capStars(3, 0), 'filled', 'g');
-
+capStars = getClosePointClusterCenters(candidates.Location, ...
+    modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
+pcshow(capStars, [0, 1, 0], 'MarkerSize', 50);
+numExistingStickers = size(capStars, 1);
+setProp(handles, 'numExistingStickers', numExistingStickers);
 numStarsToSelect = 9 - size(capStars, 1);
+setProp(handles, 'selectedPts', []);
+plotModelMesh(handles, fM, vM);
+if numStarsToSelect > 0
+    setStatusText(handles, "Found %d stickers, need to select %d stickers", numExistingStickers, ...
+        numStarsToSelect);
+elseif numStarsToSelect == 0
+    onHavingEnoughStickers(handles);
+end
+
+end
+
+function plotModelMesh(handles, fM, vM)
 [rfM, rvM] = reducepatch(fM, vM, 5000);
-vert1 = rvM(rfM(:,1),:);
-vert2 = rvM(rfM(:,2),:);
-vert3 = rvM(rfM(:,3),:);
+ver1 = rvM(rfM(:,1),:);
+ver2 = rvM(rfM(:,2),:);
+ver3 = rvM(rfM(:,3),:);
 function selectPointOnMesh(~, ~)
-    hold on;
-    curPointMat = get(gca,'CurrentPoint');
-    orig = curPointMat(1,:);
-    direction = curPointMat(2,:) - orig;
-    [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
-        orig, direction, vert1, vert2, vert3);
-    if (isfield(handles, 'ptOnModelPlot'))
-        delete(handles.ptOnModelPlot);
-    end
-    intersections = intersections(intersectionsMask, :);
-    if size(intersections, 1) >= 1
-        ptOnModel = intersections(1, :);
-        handles.ptOnModelPlot = scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'r');
-        handles.ptOnModel = ptOnModel;
-    end
+    selectPointOnMeshHelper(handles, ver1, ver2, ver3);
 end
 camlight('headlight');
 meshPlot = plotMesh(rfM, rvM);
 set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
-
 end
 
-function [faces] = facesArr(plyMesh)
+function selectPointOnMeshHelper(handles, ver1, ver2, ver3)
+hold on;
+curPointMat = get(gca, 'CurrentPoint');
+orig = curPointMat(1,:);
+direction = curPointMat(2,:) - orig;
+[intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
+    orig, direction, ver1, ver2, ver3);
+if (isfield(handles, 'ptOnModelPlot'))
+    delete(handles.ptOnModelPlot);
+end
+intersections = intersections(intersectionsMask, :);
+if size(intersections, 1) >= 1
+    ptOnModel = intersections(1, :);
+    setProp(handles, 'ptOnModelPlot', ...
+        scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'r'));
+    setProp(handles, 'ptOnModel', ptOnModel);
+    set(handles.select_pt_btn, 'Enable', 'on');
+end
+end
+
+function faces = facesArr(plyMesh)
 faces = cell2mat(plyMesh.face.vertex_indices) + 1;
 end
 
-function [vertices] = verticesArr(plyMesh)
+function vertices = verticesArr(plyMesh)
 vertices = [plyMesh.vertex.x, plyMesh.vertex.y, plyMesh.vertex.z];
 end
 
-function [normals] = normalsArr(plyMesh)
+function normals = normalsArr(plyMesh)
 normals = [plyMesh.vertex.nx, plyMesh.vertex.ny, plyMesh.vertex.nz];
 end
 
-function [p] = plotMesh(varargin)
+function meshPlot = plotMesh(varargin)
 %PLOTMESH
 %   PLOTMESH(mesh)
 %   PLOTMESH(faces, vertices)
@@ -290,17 +308,69 @@ else
     faces = varargin{1};
     vertices = varargin{2};
 end
-p = patch('Faces', faces, 'Vertices', vertices, 'EdgeColor', 'none', ...
+meshPlot = patch('Faces', faces, 'Vertices', vertices, 'EdgeColor', 'none', ...
     'FaceColor', color, 'FaceLighting', 'gouraud');
 if nargin == 1
-    p.VertexNormals = normals;
+    meshPlot.VertexNormals = normals;
 end
 end
 
-% --- If Enable == 'on', executes on mouse press in 5 pixel border.
-% --- Otherwise, executes on mouse press in 5 pixel border or over start_btn.
-function start_btn_ButtonDownFcn(hObject, ~, handles)
-% hObject    handle to start_btn (see GCBO)
+% --- Executes on button press in select_pt_btn.
+function select_pt_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to select_pt_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+set(handles.select_pt_btn, 'Enable', 'off');
+selectedPoints = getappdata(handles.selected_pts, 'selectedPts');
+numSelected = size(selectedPoints, 1);
+numExistingStickers = getProp(handles, 'numExistingStickers');
+numLeft = 9 - numExistingStickers - numSelected;
+if numLeft > 0
+    ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
+    setappdata(handles.selected_pts, 'selectedPts', [selectedPoints;ptOnModel]);
+    delete(handles.ptOnModelPlot);
+    scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'b');
+    if numLeft > 1
+        setStatusText(handles, "Found %d stickers, selected %d stickers, %d more to go", ...
+            handles.numExistingStickers, numSelected + 1, numLeft - 1);
+    else
+        onHavingEnoughStickers(handles);
+    end
+else
+    setStatusText(handles, "Cont.");
+end
+end
+
+function onHavingEnoughStickers(handles)
+set(handles.select_pt_btn, 'String', 'Confirm Selections');
+set(handles.select_pt_btn, 'Enable', 'on');
+setStatusText(handles, "No more stickers to select, confirm selections");
+end
+
+function selected_pts_CreateFcn(~, ~, ~)
+end
+
+% --- Executes on selection change in selected_pts.
+function selected_pts_Callback(hObject, ~, handles)
+% hObject    handle to selected_pts (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns selected_pts contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from selected_pts
+end
+
+% --- Executes on button press in remove_pt_btn.
+function remove_pt_btn_Callback(hObject, ~, handles)
+% hObject    handle to remove_pt_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+end
+
+function val = getProp(handles, name)
+val = getappdata(handles.selected_pts, name);
+end
+
+function setProp(handles, name, val)
+setappdata(handles.selected_pts, name, val);
 end

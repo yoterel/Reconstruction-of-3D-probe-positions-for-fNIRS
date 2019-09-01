@@ -1,4 +1,4 @@
-function setStatusText(handles, text)
-set(handles.status, 'String', text);
+function setStatusText(handles, text, varargin)
+set(handles.status, 'String', sprintf(text, varargin{:}));
 drawnow;
 end
