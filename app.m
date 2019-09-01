@@ -22,7 +22,7 @@ function varargout = app(varargin)
 
 % Edit the above text to modify the response to help app
 
-% Last Modified by GUIDE v2.5 01-Sep-2019 11:16:39
+% Last Modified by GUIDE v2.5 01-Sep-2019 15:02:14
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -140,18 +140,16 @@ function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 set(handles.start_btn, 'Enable', 'off');
 drawnow;
 
-% pc_on_model_demo(handles);
-% end
-% function foo(hObject, eventdata, handles)
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);
 mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
+setProp(handles, 'mniModelPath', mniModelPath);
 nirsModelPath = "C:\TEMP\NIRS_adult.mat";
+setProp(handles, 'nirsModelPath', nirsModelPath);
 frameSkip = 4;
 stickerMinGroupSize = 5;
 radiusToStickerRatio = 8;
@@ -212,7 +210,7 @@ setStatusText(handles, "Running ICP with different starting conditions");
 
 % Try ICP several times with different initial rotations of the sphere to
 % try to avoid local minima problems
-numRotations = 4;
+numRotations = 1;
 [~, bestTformedPc, bestRmse] = pcregistericp(pc, modelPc);
 for i = 1:(numRotations - 1)
     rotationTform = getTransformationMatrix(1, zeros(1, 3), rotx(i * 360 / numRotations));
@@ -224,27 +222,32 @@ for i = 1:(numRotations - 1)
     end
 end
 pc = bestTformedPc;
+
+% Plot transformed point cloud on the model's mesh
 hold on;
 pcshow(pc);
+plotModelMesh(handles, fM, vM);
 
 setStatusText(handles, "Matched video ply with model, calculating existing sticker positions");
 candidates = getStickerCandidates(pc, stickerHSV);
 capStars = getClosePointClusterCenters(candidates.Location, ...
     modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
-pcshow(capStars, [0, 1, 0], 'MarkerSize', 50);
 numExistingStickers = size(capStars, 1);
 setProp(handles, 'numExistingStickers', numExistingStickers);
 numStarsToSelect = 9 - size(capStars, 1);
-setProp(handles, 'selectedPts', []);
-plotModelMesh(handles, fM, vM);
-setProp(handles, 'isInSelectionMode', true);
-if numStarsToSelect > 0
-    setStatusText(handles, "Found %d stickers, need to select %d stickers", numExistingStickers, ...
-        numStarsToSelect);
+pcshow(capStars, [0, 1, 0], 'MarkerSize', 50);
+if numStarsToSelect < 0
+    %TODO: deal with case that too many stickers were found. Change
+    %parameters? (run with larger stickerMinGroupSize
 elseif numStarsToSelect == 0
     onHavingEnoughStickers(handles);
+else
+    setStatusText(handles, "Found %d stickers, need to select %d stickers", ...
+        numExistingStickers, numStarsToSelect);
 end
 
+setProp(handles, 'selectedPts', []);
+setProp(handles, 'isInSelectionMode', true);
 end
 
 function plotModelMesh(handles, fM, vM)
@@ -268,8 +271,9 @@ orig = curPointMat(1,:);
 direction = curPointMat(2,:) - orig;
 [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
     orig, direction, ver1, ver2, ver3);
-if (isfield(handles, 'ptOnModelPlot'))
-    delete(handles.ptOnModelPlot);
+ptOnModelPlot = getProp(handles, 'ptOnModelPlot');
+if (~isempty(ptOnModelPlot))
+    delete(ptOnModelPlot);
 end
 intersections = intersections(intersectionsMask, :);
 if size(intersections, 1) >= 1
@@ -327,11 +331,15 @@ selectedPoints = getappdata(handles.selected_pts, 'selectedPts');
 numSelected = size(selectedPoints, 1);
 numExistingStickers = getProp(handles, 'numExistingStickers');
 numLeft = 9 - numExistingStickers - numSelected;
+missingStars = getProp(handles, 'missingStars');
 if numLeft > 0
     ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
     setappdata(handles.selected_pts, 'selectedPts', [selectedPoints;ptOnModel]);
     delete(getProp(handles, 'ptOnModelPlot'));
     scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'b');
+    curLabel = currentPointLabel(handles);
+    setProp(handles, 'missingStars', [missingStars, curLabel]);
+    text(ptOnModel(1), ptOnModel(2), ptOnModel(3), curLabel, 'color', [0,0,1]);
     if numLeft > 1
         setStatusText(handles, "Found %d stickers, selected %d stickers, %d more to go", ...
             handles.numExistingStickers, numSelected + 1, numLeft - 1);
@@ -341,6 +349,8 @@ if numLeft > 0
 else
     setProp(handles, 'isInSelectionMode', false);
     setStatusText(handles, "Cont.");
+    
+    load(getProp(handles, 'mniModelPath'), 'modelMNI');
 end
 end
 
@@ -376,4 +386,33 @@ end
 
 function setProp(handles, name, val)
 setappdata(handles.selected_pts, name, val);
+end
+
+% --- Executes on selection change in point_label_popup.
+function point_label_popup_Callback(~, ~, ~)
+% hObject    handle to point_label_popup (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns point_label_popup contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from point_label_popup
+end
+
+function label = currentPointLabel(handles)
+pointLabelPopup = handles.point_label_popup;
+contents = cellstr(get(pointLabelPopup, 'String'));
+label = contents{get(pointLabelPopup, 'Value')};
+end
+
+% --- Executes during object creation, after setting all properties.
+function point_label_popup_CreateFcn(hObject, ~, ~)
+% hObject    handle to point_label_popup (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
 end
