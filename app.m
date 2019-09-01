@@ -174,7 +174,7 @@ outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
 vsfmInputDir = fullfile(outputDir, "vsfmInput");
 %plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
 %    frameSkip);
-plyFilePath = "C:\TEMP\denseNet.0.ply";
+plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 
 % Video folder should also contain a stickerHSV.txt file, which contains a
 % noramlized (between 0 and 1) HSV representation of the model's sticker's
@@ -237,6 +237,7 @@ setProp(handles, 'numExistingStickers', numExistingStickers);
 numStarsToSelect = 9 - size(capStars, 1);
 setProp(handles, 'selectedPts', []);
 plotModelMesh(handles, fM, vM);
+setProp(handles, 'isInSelectionMode', true);
 if numStarsToSelect > 0
     setStatusText(handles, "Found %d stickers, need to select %d stickers", numExistingStickers, ...
         numStarsToSelect);
@@ -247,19 +248,20 @@ end
 end
 
 function plotModelMesh(handles, fM, vM)
+isInSelectionMode = getProp(handles, 'isInSelectionMode');
+if ~isInSelectionMode
+    return
+end
 [rfM, rvM] = reducepatch(fM, vM, 5000);
 ver1 = rvM(rfM(:,1),:);
 ver2 = rvM(rfM(:,2),:);
 ver3 = rvM(rfM(:,3),:);
-function selectPointOnMesh(~, ~)
-    selectPointOnMeshHelper(handles, ver1, ver2, ver3);
-end
 camlight('headlight');
 meshPlot = plotMesh(rfM, rvM);
-set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
+set(meshPlot, 'ButtonDownFcn', @(~,~) selectPointOnMesh(handles, ver1, ver2, ver3));
 end
 
-function selectPointOnMeshHelper(handles, ver1, ver2, ver3)
+function selectPointOnMesh(handles, ver1, ver2, ver3)
 hold on;
 curPointMat = get(gca, 'CurrentPoint');
 orig = curPointMat(1,:);
@@ -328,7 +330,7 @@ numLeft = 9 - numExistingStickers - numSelected;
 if numLeft > 0
     ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
     setappdata(handles.selected_pts, 'selectedPts', [selectedPoints;ptOnModel]);
-    delete(handles.ptOnModelPlot);
+    delete(getProp(handles, 'ptOnModelPlot'));
     scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'b');
     if numLeft > 1
         setStatusText(handles, "Found %d stickers, selected %d stickers, %d more to go", ...
@@ -337,6 +339,7 @@ if numLeft > 0
         onHavingEnoughStickers(handles);
     end
 else
+    setProp(handles, 'isInSelectionMode', false);
     setStatusText(handles, "Cont.");
 end
 end
