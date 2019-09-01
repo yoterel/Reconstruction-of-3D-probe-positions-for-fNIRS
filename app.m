@@ -351,6 +351,7 @@ else
     setStatusText(handles, "Cont.");
     
     load(getProp(handles, 'mniModelPath'), 'modelMNI');
+    [existStars, existLabels] = findExistingStarsAndLabels(modelMNI, missingStars);
 end
 end
 
