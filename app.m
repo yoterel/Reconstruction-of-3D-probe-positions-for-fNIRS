@@ -157,9 +157,6 @@ drawnow;
 modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited.ply";
 %plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
 plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
-% compare_pc_and_model(handles, plyFilePath, modelMeshPath);
-% end
-% function foo()
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);
@@ -217,8 +214,6 @@ showPcAndModel(handles, pc, modelPc.Location, fM);
 [pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc);
 [rfM, rvM] = reducepatch(fM, modelPc.Location, 8000);
 showPcAndModel(handles, pc, rvM, rfM);
-% end
-% function fooa()
 [pc, ~, ~, bestRmse, modelPlot] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
 
 setStatusText(handles, ...
@@ -301,11 +296,11 @@ else
     bestScale = highScale;
 end
 pc = bestTformedPc;
-modelPlot = showPcAndModel(handles, pc, vM, fM);
+[~, modelPlot] = showPcAndModel(handles, pc, vM, fM);
 
 % Try ICP several times with different initial rotations of the sphere to
 % try to avoid local minima problems
-rotationsPerAxis = 2;
+rotationsPerAxis = 3;
 angleStep = 360 / rotationsPerAxis;
 bestPrepRotation = eye(3);
 for i = 1:rotationsPerAxis
@@ -322,7 +317,7 @@ for i = 1:rotationsPerAxis
                 bestTformedPc = tformedPc;
                 bestRmse = rmse;
                 bestPrepRotation = prepRotation;
-                modelPlot = showPcAndModel(handles, bestTformedPc, vM, fM);
+                [~, modelPlot] = showPcAndModel(handles, bestTformedPc, vM, fM);
             end
             setStatusText(handles, ...
                 "Finished ICP rotation iteration %d, best current rmse is: %f", ...
