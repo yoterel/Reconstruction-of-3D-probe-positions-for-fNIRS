@@ -142,7 +142,7 @@ setStatusText(handles, "Plotting pc and mesh");
 vM = verticesArr(modelMesh);
 fM = facesArr(modelMesh);
 pcshow(pc);
-plotModelMesh(handles, fM, vM);
+allowSelectionOnModelMesh(handles, fM, vM);
 drawnow;
 end
 
@@ -155,7 +155,8 @@ set(handles.start_btn, 'Enable', 'off');
 drawnow;
 %modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
 modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited.ply";
-plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
+%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
+plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 % compare_pc_and_model(handles, plyFilePath, modelMeshPath);
 % end
 % function foo()
@@ -209,24 +210,20 @@ setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyread(plyFilePath));
 setStatusText(handles, "Reading model mesh");
 modelMesh = plyread(modelMeshPath);
-vM = verticesArr(modelMesh);
 fM = facesArr(modelMesh);
 modelPc = structToPointCloud(modelMesh, false);
+showPcAndModel(handles, pc, modelPc.Location, fM);
 
-[pc, modelSphereR] = sphereAdjustPcToModel(handles, pc, vM);
-% hold on;
-% pcshow(pc);
-% plotModelMesh(handles, fM, vM);
+[pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc);
+[rfM, rvM] = reducepatch(fM, modelPc.Location, 8000);
+showPcAndModel(handles, pc, rvM, rfM);
 % end
 % function fooa()
-[pc, ~, ~] = icpAdjustPcToModel(handles, pc, modelPc);
+[pc, ~, ~, bestRmse, modelPlot] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
 
-% Plot transformed point cloud on the model's mesh
-hold on;
-pcshow(pc);
-plotModelMesh(handles, fM, vM);
-
-setStatusText(handles, "Matched video ply with model, calculating existing sticker positions");
+setStatusText(handles, ...
+    "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
+    bestRmse);
 candidates = getStickerCandidates(pc, stickerHSV);
 capStars = getClosePointClusterCenters(candidates.Location, ...
     modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
@@ -242,20 +239,34 @@ elseif numStarsToSelect == 0
 else
     setStatusText(handles, "Found %d stickers, need to select %d stickers", ...
         numExistingStickers, numStarsToSelect);
+    allowSelectionOnModelMesh(handles, rfM, rvM, modelPlot);
+end
 end
 
-setProp(handles, 'selectedPts', []);
-setProp(handles, 'isInSelectionMode', true);
+function [pcPlot, modelPlot] = showPcAndModel(handles, pc, vM, fM)
+hold off;
+pcPlot = pcshow(pc);
+hold on;
+camlight('headlight');
+modelPlot = plotMesh(fM, vM);
+drawnow;
 end
 
-function [tformedPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, vM)
+function [tformedPc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc)
+%SPHEREADJUSTPCTOMODEL scaled and translates the given point cloud to match
+%the model point cloud, and centers them both at the origin, based on
+%approximating spheres.
 setStatusText(handles, "Initial adjustments of point cloud to mesh");
 pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
-[~, modelSphereR, scale, translate] = sphereScaleAndTranslate(vM, pc.Location);
-tformedPc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
+[modelSphereC, modelSphereR, scale, translate] = ...
+    sphereScaleAndTranslate(modelPc.Location, pc.Location);
+modelPc = pctransform(modelPc, affine3d(getTransformationMatrix(1, -modelSphereC)));
+tformedPc = pctransform(pc, affine3d(getTransformationMatrix(scale, ...
+    translate - modelSphereC * scale)));
 end
 
-function [bestTformedPc, bestPrepRotation, bestScale] = icpAdjustPcToModel(handles, pc, modelPc)
+function [bestTformedPc, bestPrepRotation, bestScale, bestRmse, modelPlot] = icpAdjustPcToModel(...
+    handles, pc, modelPc, vM, fM)
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
 % TODO: Combined axis rotations? Can add getRotationMatrix with 3 angles as
@@ -267,9 +278,9 @@ highScale = 1.3;
 setStatusText(handles, "Performing initial ICP scalings");
 [lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
 [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
+setStatusText(handles, "Finished initial scaling, best current rmse is: %f", ...
+    min(lowRmse, highRmse));
 for i = 1:5
-    setStatusText(handles, "ICP scaling iteration %d, best current rmse is: %f", ...
-        i, min(lowRmse, highRmse));
     if lowRmse < highRmse
         highScale = (lowScale + highScale) / 2;
         [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
@@ -277,6 +288,8 @@ for i = 1:5
         lowScale = (lowScale + highScale) / 2;
         [lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
     end
+    setStatusText(handles, "Finished ICP scaling iteration %d, best current rmse is: %f", ...
+        i, min(lowRmse, highRmse));
 end
 if lowRmse < highRmse
     bestTformedPc = lowScalePc;
@@ -287,49 +300,35 @@ else
     bestRmse = highRmse;
     bestScale = highScale;
 end
+pc = bestTformedPc;
+modelPlot = showPcAndModel(handles, pc, vM, fM);
 
 % Try ICP several times with different initial rotations of the sphere to
 % try to avoid local minima problems
-rotationsPerAxis = 4;
+rotationsPerAxis = 2;
+angleStep = 360 / rotationsPerAxis;
 bestPrepRotation = eye(3);
-setStatusText(handles, "ICP rotation iteration %d, best current rmse is: %f", 1, bestRmse);
-for i = 1:(rotationsPerAxis - 1)
-    prepRotation = rotx(i * 360 / rotationsPerAxis);
-    rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
-    tmpPc = pctransform(pc, affine3d(rotationTform));
-    [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
-    if rmse < bestRmse
-        bestTformedPc = tformedPc;
-        bestRmse = rmse;
-        bestPrepRotation = prepRotation;
+for i = 1:rotationsPerAxis
+    for j = 1:rotationsPerAxis
+        for k = 1:rotationsPerAxis
+            if i == 1 && j == 1 && k == 1
+                continue;
+            end
+            prepRotation = rotx(i * angleStep) * roty(j * angleStep) * rotz(k * angleStep);
+            rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
+            tmpPc = pctransform(pc, affine3d(rotationTform));
+            [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
+            if rmse < bestRmse
+                bestTformedPc = tformedPc;
+                bestRmse = rmse;
+                bestPrepRotation = prepRotation;
+                modelPlot = showPcAndModel(handles, bestTformedPc, vM, fM);
+            end
+            setStatusText(handles, ...
+                "Finished ICP rotation iteration %d, best current rmse is: %f", ...
+                rotationsPerAxis^2 * (i - 1) + rotationsPerAxis * (j - 1) + k - 1, bestRmse);
+        end
     end
-    setStatusText(handles, "ICP Iteration %d, best current rmse is: %f", 1 + i, bestRmse);
-end
-for i = 1:(rotationsPerAxis - 1)
-    prepRotation = roty(i * 360 / rotationsPerAxis);
-    rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
-    tmpPc = pctransform(pc, affine3d(rotationTform));
-    [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
-    if rmse < bestRmse
-        bestTformedPc = tformedPc;
-        bestRmse = rmse;
-        bestPrepRotation = prepRotation;
-    end
-    setStatusText(handles, "ICP Iteration %d, best current rmse is: %f", ...
-        rotationsPerAxis + i, bestRmse);
-end
-for i = 1:(rotationsPerAxis - 1)
-    prepRotation = rotz(i * 360 / rotationsPerAxis);
-    rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
-    tmpPc = pctransform(pc, affine3d(rotationTform));
-    [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
-    if rmse < bestRmse
-        bestTformedPc = tformedPc;
-        bestRmse = rmse;
-        bestPrepRotation = prepRotation;
-    end
-    setStatusText(handles, "ICP Iteration %d, best current rmse is: %f", ...
-        2 * rotationsPerAxis + i - 1, bestRmse);
 end
 end
 
@@ -339,14 +338,13 @@ movingPc = pctransform(movingPc, affine3d(tform));
 [~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
-function plotModelMesh(handles, fM, vM)
-[rfM, rvM] = reducepatch(fM, vM, 8000);
+function allowSelectionOnModelMesh(handles, rfM, rvM, modelPlot)
+setProp(handles, 'selectedPts', []);
+setProp(handles, 'isInSelectionMode', true);
 ver1 = rvM(rfM(:,1),:);
 ver2 = rvM(rfM(:,2),:);
 ver3 = rvM(rfM(:,3),:);
-camlight('headlight');
-meshPlot = plotMesh(rfM, rvM);
-set(meshPlot, 'ButtonDownFcn', @(~,~) selectPointOnMesh(handles, ver1, ver2, ver3));
+set(modelPlot, 'ButtonDownFcn', @(~,~) selectPointOnMesh(handles, ver1, ver2, ver3));
 end
 
 function selectPointOnMesh(handles, ver1, ver2, ver3)
@@ -454,7 +452,7 @@ function selected_pts_CreateFcn(~, ~, ~)
 end
 
 % --- Executes on selection change in selected_pts.
-function selected_pts_Callback(hObject, ~, handles)
+function selected_pts_Callback(~, ~, handles)
 % hObject    handle to selected_pts (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -464,7 +462,7 @@ function selected_pts_Callback(hObject, ~, handles)
 end
 
 % --- Executes on button press in remove_pt_btn.
-function remove_pt_btn_Callback(hObject, ~, handles)
+function remove_pt_btn_Callback(~, ~, handles)
 % hObject    handle to remove_pt_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
