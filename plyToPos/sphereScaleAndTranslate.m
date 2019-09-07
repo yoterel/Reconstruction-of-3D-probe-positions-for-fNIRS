@@ -15,5 +15,5 @@ function [sourceC, sourceR, scale, translate] = sphereScaleAndTranslate(sourcePc
 [sourceC, sourceR] = sphereFit(sourcePc);
 [targetC, targetR] = sphereFit(targetPc);
 scale = sourceR / targetR;
-translate = sourceC - targetC;
+translate = (sourceC - targetC)*scale;
 end

@@ -60,7 +60,7 @@ guidata(hObject, handles);
 
 % UIWAIT makes app wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
-addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos')
+addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', 'TriangleRayIntersection')
 end
 
 % --- Outputs from this function are returned to the command line.
@@ -75,8 +75,6 @@ varargout{1} = handles.output;
 end
 
 function pc_on_model_demo(handles)
-addpath('TriangleRayIntersection');
-
 resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
 reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
@@ -216,12 +214,12 @@ fM = facesArr(modelMesh);
 modelPc = structToPointCloud(modelMesh, false);
 
 [pc, modelSphereR] = sphereAdjustPcToModel(handles, pc, vM);
-hold on;
+% hold on;
 % pcshow(pc);
 % plotModelMesh(handles, fM, vM);
 % end
 % function fooa()
-pc = icpAdjustPcToModel(handles, pc, modelPc);
+[pc, ~, ~] = icpAdjustPcToModel(handles, pc, modelPc);
 
 % Plot transformed point cloud on the model's mesh
 hold on;
@@ -257,18 +255,44 @@ pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
 tformedPc = pctransform(pc, affine3d(getTransformationMatrix(scale, translate)));
 end
 
-function [bestTformedPc, bestPrepRotation] = icpAdjustPcToModel(handles, pc, modelPc)
+function [bestTformedPc, bestPrepRotation, bestScale] = icpAdjustPcToModel(handles, pc, modelPc)
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
 % TODO: Combined axis rotations? Can add getRotationMatrix with 3 angles as
 % helper.
 
+% Binary search for another finer scaling based on ICP errors
+lowScale = 0.7;
+highScale = 1.3;
+setStatusText(handles, "Performing initial ICP scalings");
+[lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
+[highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
+for i = 1:5
+    setStatusText(handles, "ICP scaling iteration %d, best current rmse is: %f", ...
+        i, min(lowRmse, highRmse));
+    if lowRmse < highRmse
+        highScale = (lowScale + highScale) / 2;
+        [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
+    else
+        lowScale = (lowScale + highScale) / 2;
+        [lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
+    end
+end
+if lowRmse < highRmse
+    bestTformedPc = lowScalePc;
+    bestRmse = lowRmse;
+    bestScale = lowScale;
+else
+    bestTformedPc = highScalePc;
+    bestRmse = highRmse;
+    bestScale = highScale;
+end
+
 % Try ICP several times with different initial rotations of the sphere to
 % try to avoid local minima problems
-rotationsPerAxis = 6;
-[~, bestTformedPc, bestRmse] = pcregistericp(pc, modelPc);
+rotationsPerAxis = 4;
 bestPrepRotation = eye(3);
-setStatusText(handles, "ICP Iteration %d, best current rmse is: %f", 1, bestRmse);
+setStatusText(handles, "ICP rotation iteration %d, best current rmse is: %f", 1, bestRmse);
 for i = 1:(rotationsPerAxis - 1)
     prepRotation = rotx(i * 360 / rotationsPerAxis);
     rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
@@ -307,6 +331,12 @@ for i = 1:(rotationsPerAxis - 1)
     setStatusText(handles, "ICP Iteration %d, best current rmse is: %f", ...
         2 * rotationsPerAxis + i - 1, bestRmse);
 end
+end
+
+function [tformedPc, rmse] = scaleAndICP(scale, movingPc, fixedPc)
+tform = getTransformationMatrix(scale, zeros(1, 3));
+movingPc = pctransform(movingPc, affine3d(tform));
+[~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
 function plotModelMesh(handles, fM, vM)

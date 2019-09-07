@@ -126,6 +126,15 @@ figure;
 pcshow(pcRemoveOutliers(pc, 1.5));
 end
 
+function pcRemoveOutliersDemo2()
+pc = structToPointCloud(plyread("C:\TEMP\SagiUpdatedAdult.ply"));
+for stdev = 1:0.1:2.5
+    cleaned = pcRemoveOutliers(pc, stdev);
+    pcwrite(cleaned, sprintf("C:\\TEMP\\Cleaned\\SagiUpdatedAdultCleaned-%0.1f.ply", stdev), ...
+        'PLYFormat', 'binary');
+end
+end
+
 function [faces] = facesArr(plyMesh)
 faces = cell2mat(plyMesh.face.vertex_indices) + 1;
 end
