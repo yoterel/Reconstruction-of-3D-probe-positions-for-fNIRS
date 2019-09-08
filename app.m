@@ -214,7 +214,7 @@ showPcAndModel(handles, pc, modelPc.Location, fM);
 [pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc);
 [rfM, rvM] = reducepatch(fM, modelPc.Location, 8000);
 showPcAndModel(handles, pc, rvM, rfM);
-[pc, ~, ~, bestRmse, modelPlot] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
+[pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
 
 setStatusText(handles, ...
     "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
@@ -264,18 +264,28 @@ function [bestTformedPc, bestPrepRotation, bestScale, bestRmse] = icpAdjustPcToM
     handles, pc, modelPc, vM, fM)
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
-% TODO: Combined axis rotations? Can add getRotationMatrix with 3 angles as
-% helper.
 
 % Binary search for another finer scaling based on ICP errors
-lowScale = 0.7;
-highScale = 1.3;
+[bestTformedPc, bestRmse, bestScale] = icpFindBestScale(handles, 0.7, 1.3, pc, modelPc, 5);
+pc = bestTformedPc;
+showPcAndModel(handles, pc, vM, fM);
+
+% Try ICP several times with different initial rotations to try to avoid
+% local minima problems
+[bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
+    handles, pc, modelPc, 3, bestRmse);
+end
+
+function [bestTformedPc, bestRmse, bestScale] = icpFindBestScale(...
+    handles, lowScale, highScale, pc, modelPc, iterations)
+%ICPFINDBESTSCALE Perorms a binary search for finding the best scale, based
+%on ICP errors
 setStatusText(handles, "Performing initial ICP scalings");
 [lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
 [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
 setStatusText(handles, "Finished initial scaling, best current rmse is: %f", ...
     min(lowRmse, highRmse));
-for i = 1:5
+for i = 1:iterations
     if lowRmse < highRmse
         highScale = (lowScale + highScale) / 2;
         [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
@@ -295,14 +305,24 @@ else
     bestRmse = highRmse;
     bestScale = highScale;
 end
-pc = bestTformedPc;
-showPcAndModel(handles, pc, vM, fM);
+end
 
-% Try ICP several times with different initial rotations of the sphere to
-% try to avoid local minima problems
-rotationsPerAxis = 3;
+function [tformedPc, rmse] = scaleAndICP(scale, movingPc, fixedPc)
+tform = getTransformationMatrix(scale, zeros(1, 3));
+movingPc = pctransform(movingPc, affine3d(tform));
+[~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
+end
+
+function [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
+    handles, pc, modelPc, rotationsPerAxis, bestRmse)
+%COMBINEDROTATIONICP Runs ICP several times with different initial
+%rotations of the given point cloud in several axes to try to avoid local
+%minima problems. The number of rotations is rotationsPerAxis^3 - 1: all
+%combinations of rotations per axis for 3 axes, except the trivial rotation
+%which is assumed to already be tested.
 angleStep = 360 / rotationsPerAxis;
 bestPrepRotation = eye(3);
+bestTformedPc = pc;
 for i = 1:rotationsPerAxis
     for j = 1:rotationsPerAxis
         for k = 1:rotationsPerAxis
@@ -325,12 +345,6 @@ for i = 1:rotationsPerAxis
         end
     end
 end
-end
-
-function [tformedPc, rmse] = scaleAndICP(scale, movingPc, fixedPc)
-tform = getTransformationMatrix(scale, zeros(1, 3));
-movingPc = pctransform(movingPc, affine3d(tform));
-[~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
 function allowSelectionOnModelMesh(handles, rfM, rvM, pc)
