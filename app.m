@@ -153,10 +153,10 @@ function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.start_btn, 'Enable', 'off');
 drawnow;
-%modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
-modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited.ply";
-%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
-plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
+modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
+%modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
+plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult15\video1\dense.0.ply";
+%plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);
@@ -273,7 +273,7 @@ showPcAndModel(handles, pc, vM, fM);
 % Try ICP several times with different initial rotations to try to avoid
 % local minima problems
 [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
-    handles, pc, modelPc, 3, bestRmse);
+    handles, pc, modelPc, bestRmse, vM, fM, 3);
 end
 
 function [bestTformedPc, bestRmse, bestScale] = icpFindBestScale(...
@@ -281,17 +281,17 @@ function [bestTformedPc, bestRmse, bestScale] = icpFindBestScale(...
 %ICPFINDBESTSCALE Perorms a binary search for finding the best scale, based
 %on ICP errors
 setStatusText(handles, "Performing initial ICP scalings");
-[lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
-[highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
+[lowScalePc, lowRmse] = tformAndICP(pc, modelPc, lowScale);
+[highScalePc, highRmse] = tformAndICP(pc, modelPc, highScale);
 setStatusText(handles, "Finished initial scaling, best current rmse is: %f", ...
     min(lowRmse, highRmse));
 for i = 1:iterations
     if lowRmse < highRmse
         highScale = (lowScale + highScale) / 2;
-        [highScalePc, highRmse] = scaleAndICP(highScale, pc, modelPc);
+        [highScalePc, highRmse] = tformAndICP(pc, modelPc, highScale);
     else
         lowScale = (lowScale + highScale) / 2;
-        [lowScalePc, lowRmse] = scaleAndICP(lowScale, pc, modelPc);
+        [lowScalePc, lowRmse] = tformAndICP(pc, modelPc, lowScale);
     end
     setStatusText(handles, "Finished ICP scaling iteration %d, best current rmse is: %f", ...
         i, min(lowRmse, highRmse));
@@ -307,14 +307,17 @@ else
 end
 end
 
-function [tformedPc, rmse] = scaleAndICP(scale, movingPc, fixedPc)
-tform = getTransformationMatrix(scale, zeros(1, 3));
+function [tformedPc, rmse] = tformAndICP(movingPc, fixedPc, scale, rotation)
+if nargin < 4
+    rotation = eye(3);
+end
+tform = getTransformationMatrix(scale, zeros(1, 3), rotation);
 movingPc = pctransform(movingPc, affine3d(tform));
 [~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
 function [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
-    handles, pc, modelPc, rotationsPerAxis, bestRmse)
+    handles, pc, modelPc, bestRmse, vM, fM, rotationsPerAxis)
 %COMBINEDROTATIONICP Runs ICP several times with different initial
 %rotations of the given point cloud in several axes to try to avoid local
 %minima problems. The number of rotations is rotationsPerAxis^3 - 1: all
@@ -330,9 +333,7 @@ for i = 1:rotationsPerAxis
                 continue;
             end
             prepRotation = rotx(i * angleStep) * roty(j * angleStep) * rotz(k * angleStep);
-            rotationTform = getTransformationMatrix(1, zeros(1, 3), prepRotation);
-            tmpPc = pctransform(pc, affine3d(rotationTform));
-            [~, tformedPc, rmse] = pcregistericp(tmpPc, modelPc);
+            [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
             if rmse < bestRmse
                 bestTformedPc = tformedPc;
                 bestRmse = rmse;
@@ -344,6 +345,58 @@ for i = 1:rotationsPerAxis
                 rotationsPerAxis^2 * (i - 1) + rotationsPerAxis * (j - 1) + k - 1, bestRmse);
         end
     end
+end
+end
+
+function [bestTformedPc, bestRmse, bestPrepRotation] = singleAxisRotationsICP(...
+    handles, pc, modelPc, bestRmse, vM, fM, rotationsX, rotationsY, rotationsZ)
+%COMBINEDROTATIONICP Runs ICP several times with different initial
+%rotations of the given point cloud (each rotation in a single axis) to try
+%to avoid local minima problems. The number of rotations is rotationsX +
+%rotationsY + rotationsZ - 3 (trivial rotations aren't tested).
+bestPrepRotation = eye(3);
+bestTformedPc = pc;
+
+angleStep = 360 / rotationsX;
+for i = 1:(rotationsX - 1)
+    prepRotation = rotx(i * angleStep);
+    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse
+        bestTformedPc = tformedPc;
+        bestRmse = rmse;
+        bestPrepRotation = prepRotation;
+        showPcAndModel(handles, bestTformedPc, vM, fM);
+    end
+    setStatusText(handles, "Finished ICP rotation iteration %d, best current rmse is: %f", ...
+        i, bestRmse);
+end
+
+angleStep = 360 / rotationsY;
+for i = 1:(rotationsY - 1)
+    prepRotation = roty(i * angleStep);
+    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse
+        bestTformedPc = tformedPc;
+        bestRmse = rmse;
+        bestPrepRotation = prepRotation;
+        showPcAndModel(handles, bestTformedPc, vM, fM);
+    end
+    setStatusText(handles, "Finished ICP rotation iteration %d, best current rmse is: %f", ...
+        i + rotationsX - 1, bestRmse);
+end
+
+angleStep = 360 / rotationsZ;
+for i = 1:(rotationsZ - 1)
+    prepRotation = rotz(i * angleStep);
+    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse
+        bestTformedPc = tformedPc;
+        bestRmse = rmse;
+        bestPrepRotation = prepRotation;
+        showPcAndModel(handles, bestTformedPc, vM, fM);
+    end
+    setStatusText(handles, "Finished ICP rotation iteration %d, best current rmse is: %f", ...
+        i + rotationsX + rotationsY - 2, bestRmse);
 end
 end
 
