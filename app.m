@@ -234,7 +234,7 @@ elseif numStarsToSelect == 0
 else
     setStatusText(handles, "Found %d stickers, need to select %d stickers", ...
         numExistingStickers, numStarsToSelect);
-    allowSelectionOnModelMesh(handles, rfM, rvM, modelPlot);
+    allowSelectionOnModelMesh(handles, rfM, rvM, pc);
 end
 end
 
@@ -260,7 +260,7 @@ tformedPc = pctransform(pc, affine3d(getTransformationMatrix(scale, ...
     translate - modelSphereC * scale)));
 end
 
-function [bestTformedPc, bestPrepRotation, bestScale, bestRmse, modelPlot] = icpAdjustPcToModel(...
+function [bestTformedPc, bestPrepRotation, bestScale, bestRmse] = icpAdjustPcToModel(...
     handles, pc, modelPc, vM, fM)
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
@@ -296,7 +296,7 @@ else
     bestScale = highScale;
 end
 pc = bestTformedPc;
-[~, modelPlot] = showPcAndModel(handles, pc, vM, fM);
+showPcAndModel(handles, pc, vM, fM);
 
 % Try ICP several times with different initial rotations of the sphere to
 % try to avoid local minima problems
@@ -317,7 +317,7 @@ for i = 1:rotationsPerAxis
                 bestTformedPc = tformedPc;
                 bestRmse = rmse;
                 bestPrepRotation = prepRotation;
-                [~, modelPlot] = showPcAndModel(handles, bestTformedPc, vM, fM);
+                showPcAndModel(handles, bestTformedPc, vM, fM);
             end
             setStatusText(handles, ...
                 "Finished ICP rotation iteration %d, best current rmse is: %f", ...
@@ -333,7 +333,8 @@ movingPc = pctransform(movingPc, affine3d(tform));
 [~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
-function allowSelectionOnModelMesh(handles, rfM, rvM, modelPlot)
+function allowSelectionOnModelMesh(handles, rfM, rvM, pc)
+[~, modelPlot] = showPcAndModel(handles, pc, rvM, rfM);
 setProp(handles, 'selectedPts', []);
 setProp(handles, 'isInSelectionMode', true);
 ver1 = rvM(rfM(:,1),:);
@@ -354,12 +355,13 @@ direction = curPointMat(2,:) - orig;
 [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
     orig, direction, ver1, ver2, ver3);
 ptOnModelPlot = getProp(handles, 'ptOnModelPlot');
-if (~isempty(ptOnModelPlot))
+if ~isempty(ptOnModelPlot)
     delete(ptOnModelPlot);
 end
 intersections = intersections(intersectionsMask, :);
 if size(intersections, 1) >= 1
-    ptOnModel = intersections(1, :);
+    [~, closestIntersectionIndex] = min(vecnorm((intersections - orig)'));
+    ptOnModel = intersections(closestIntersectionIndex, :);
     setProp(handles, 'ptOnModelPlot', ...
         scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'r'));
     setProp(handles, 'ptOnModel', ptOnModel);
