@@ -155,7 +155,7 @@ set(handles.start_btn, 'Enable', 'off');
 drawnow;
 %modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
 modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
-%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult15\video2\dense.0.ply";
+%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
 plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
@@ -200,8 +200,6 @@ shimadzuFilePath = "C:\TEMP\adult.txt";
 plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
 addpath(spmPath, genpath(spmFNIRSPath));
 setStatusText(handles, "Converting .ply file to .pos file");
-%plyToPOS(plyFilePath, stickerHSV, mniModelPath, shimadzuFilePath, plyToPosOutputDir, ...
-%    nirsModelPath, stickerMinGroupSize, radiusToStickerRatio);
 
 setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyread(plyFilePath));
@@ -220,12 +218,8 @@ showPcAndModel(handles, pc, rvM, rfM);
 setStatusText(handles, ...
     "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
     bestRmse);
-candidates = getStickerCandidates(pc, stickerHSV);
-capStars = getClosePointClusterCenters(candidates.Location, ...
-    modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
-numExistingStickers = size(capStars, 1);
-setProp(handles, 'numExistingStickers', numExistingStickers);
-numStarsToSelect = 9 - numExistingStickers;
+[capStars, numExistingStickers, numStarsToSelect] = calculateCapStars(handles, stickerHSV, pc, ...
+    modelSphereR, radiusToStickerRatio, stickerMinGroupSize);
 if numStarsToSelect < 0
     %TODO: deal with case that too many stickers were found. Change
     %parameters? (run with larger stickerMinGroupSize
@@ -278,7 +272,7 @@ showPcAndModel(handles, pc, vM, fM);
 % Try ICP several times with different initial rotations to try to avoid
 % local minima problems
 [pc, ~, bestPrepRotation] = singleAxisRotationsICP(...
-    handles, pc, modelPc, bestRmse, vM, fM, 10, 10, 10);
+    handles, pc, modelPc, bestRmse, vM, fM, 15, 15, 15);
 % [pc, ~, bestPrepRotation] = combinedRotationsICP(...
 %     handles, pc, modelPc, bestRmse, vM, fM, 3);
 
@@ -476,10 +470,20 @@ else
     vertices = varargin{2};
 end
 meshPlot = patch('Faces', faces, 'Vertices', vertices, 'EdgeColor', 'none', ...
-    'FaceColor', color, 'FaceLighting', 'gouraud');
+    'FaceColor', color, 'FaceLighting', 'gouraud', 'FaceAlpha', 0.5);
 if nargin == 1
     meshPlot.VertexNormals = normals;
 end
+end
+
+function [capStars, numExistingStickers, numStarsToSelect] = calculateCapStars(handles, ...
+    stickerHSV, pc, modelSphereR, radiusToStickerRatio, stickerMinGroupSize)
+candidates = getStickerCandidates(pc, stickerHSV);
+capStars = getClosePointClusterCenters(candidates.Location, ...
+    modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
+numExistingStickers = size(capStars, 1);
+setProp(handles, 'numExistingStickers', numExistingStickers);
+numStarsToSelect = 9 - numExistingStickers;
 end
 
 % --- Executes on button press in select_pt_btn.
