@@ -153,10 +153,10 @@ function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.start_btn, 'Enable', 'off');
 drawnow;
-modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
-%modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
-plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult15\video1\dense.0.ply";
-%plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
+%modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
+modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
+%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult15\video2\dense.0.ply";
+plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
 vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
 vidPath = vidPath(1);
@@ -207,15 +207,16 @@ setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyread(plyFilePath));
 setStatusText(handles, "Reading model mesh");
 modelMesh = plyread(modelMeshPath);
-fM = facesArr(modelMesh);
-modelPc = structToPointCloud(modelMesh, false);
-showPcAndModel(handles, pc, modelPc.Location, fM);
 
-[pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc);
-[rfM, rvM] = reducepatch(fM, modelPc.Location, 8000);
+setStatusText(handles, "Simplifying model mesh");
+[rfM, rvM] = reducepatch(facesArr(modelMesh), verticesArr(modelMesh), 8000);
 showPcAndModel(handles, pc, rvM, rfM);
-[pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
 
+[pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc,  pointCloud(rvM));
+rvM = modelPc.Location;
+showPcAndModel(handles, pc, rvM, rfM);
+
+[pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
 setStatusText(handles, ...
     "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
     bestRmse);
@@ -224,8 +225,7 @@ capStars = getClosePointClusterCenters(candidates.Location, ...
     modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
 numExistingStickers = size(capStars, 1);
 setProp(handles, 'numExistingStickers', numExistingStickers);
-numStarsToSelect = 9 - size(capStars, 1);
-pcshow(capStars, [0, 1, 0], 'MarkerSize', 50);
+numStarsToSelect = 9 - numExistingStickers;
 if numStarsToSelect < 0
     %TODO: deal with case that too many stickers were found. Change
     %parameters? (run with larger stickerMinGroupSize
@@ -236,6 +236,9 @@ else
         numExistingStickers, numStarsToSelect);
     allowSelectionOnModelMesh(handles, rfM, rvM, pc);
 end
+% This must be executed after allowSelectionOnModelMesh, which first
+% clears the current plot
+pcshow(capStars, [0, 1, 0], 'MarkerSize', 100);
 end
 
 function [pcPlot, modelPlot] = showPcAndModel(handles, pc, vM, fM)
@@ -265,6 +268,8 @@ function [bestTformedPc, bestPrepRotation, bestScale, bestRmse] = icpAdjustPcToM
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
 
+[pc, ~, ~] = combinedRotationsICP(handles, pc, modelPc, inf, vM, fM, 2);
+
 % Binary search for another finer scaling based on ICP errors
 [bestTformedPc, bestRmse, bestScale] = icpFindBestScale(handles, 0.7, 1.3, pc, modelPc, 5);
 pc = bestTformedPc;
@@ -272,14 +277,19 @@ showPcAndModel(handles, pc, vM, fM);
 
 % Try ICP several times with different initial rotations to try to avoid
 % local minima problems
-[bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
-    handles, pc, modelPc, bestRmse, vM, fM, 3);
+[pc, ~, bestPrepRotation] = singleAxisRotationsICP(...
+    handles, pc, modelPc, bestRmse, vM, fM, 10, 10, 10);
+% [pc, ~, bestPrepRotation] = combinedRotationsICP(...
+%     handles, pc, modelPc, bestRmse, vM, fM, 3);
+
+[bestTformedPc, bestRmse, bestScale2] = icpFindBestScale(handles, 0.8, 1.2, pc, modelPc, 5);
+bestScale = bestScale * bestScale2;
 end
 
 function [bestTformedPc, bestRmse, bestScale] = icpFindBestScale(...
     handles, lowScale, highScale, pc, modelPc, iterations)
-%ICPFINDBESTSCALE Perorms a binary search for finding the best scale, based
-%on ICP errors
+%ICPFINDBESTSCALE Performs a binary search for finding the best scale,
+%based on ICP errors
 setStatusText(handles, "Performing initial ICP scalings");
 [lowScalePc, lowRmse] = tformAndICP(pc, modelPc, lowScale);
 [highScalePc, highRmse] = tformAndICP(pc, modelPc, highScale);
