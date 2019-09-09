@@ -203,6 +203,9 @@ setStatusText(handles, "Converting .ply file to .pos file");
 
 setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyread(plyFilePath));
+pcshow(pc);
+pc = cleanGeneratedPointCloud(handles, pc);
+
 setStatusText(handles, "Reading model mesh");
 modelMesh = plyread(modelMeshPath);
 
@@ -235,6 +238,21 @@ end
 pcshow(capStars, [0, 1, 0], 'MarkerSize', 100);
 end
 
+function pc = cleanGeneratedPointCloud(handles, pc)
+%CLEANGENERATEDPOINTCLOUD Removes black points which are often noise, and
+%removes points that are too far away from the center of mass
+setStatusText(handles, "Initial cleaning of the generated point cloud");
+pc = pcRemoveOutliers(pc);
+colors = pc.Color;
+r = colors(:, 1);
+g = colors(:, 2);
+b = colors(:, 3);
+rgbThreshold = 5;
+mask = (r > rgbThreshold) | (g > rgbThreshold) | (b > rgbThreshold);
+pc = filterPcPoints(pc, mask);
+pcshow(pc);
+end
+
 function [pcPlot, modelPlot] = showPcAndModel(handles, pc, vM, fM)
 hold off;
 pcPlot = pcshow(pc);
@@ -248,8 +266,7 @@ function [tformedPc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc,
 %SPHEREADJUSTPCTOMODEL scaled and translates the given point cloud to match
 %the model point cloud, and centers them both at the origin, based on
 %approximating spheres.
-setStatusText(handles, "Initial adjustments of point cloud to mesh");
-pc = pcRemoveOutliers(pc); %TODO: can change stdev if necessary
+setStatusText(handles, "Using approximating spheres to adjust point cloud to model");
 [modelSphereC, modelSphereR, scale, translate] = ...
     sphereScaleAndTranslate(modelPc.Location, pc.Location);
 modelPc = pctransform(modelPc, affine3d(getTransformationMatrix(1, -modelSphereC)));
