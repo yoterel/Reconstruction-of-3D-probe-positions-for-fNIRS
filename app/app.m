@@ -65,15 +65,6 @@ addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', ...
 setProp(handles, 'varargin', varargin);
 end
 
-% --- Executes on button press in start_btn.
-function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
-% hObject    handle to start_btn (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-set(hObject, 'Enable', 'off');
-drawnow;
-end
-
 % --- Outputs from this function are returned to the command line.
 function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
 % varargout  cell array for returning output args (see VARARGOUT);
@@ -93,7 +84,6 @@ toolPath = sprintf('%s', varargin{4});
 vidPath = dir(varargin{2});
 vidPath = vidPath(1);
 mniModelPath = varargin{7};
-setProp(handles, 'mniModelPath', mniModelPath);
 nirsModelPath = varargin{5};
 setProp(handles, 'nirsModelPath', nirsModelPath);
 frameSkip = varargin{11};
@@ -145,11 +135,14 @@ setStatusText(handles, "Simplifying model mesh");
 [rfM, rvM] = reducepatch(facesArr(modelMesh), verticesArr(modelMesh), 8000);
 showPcAndModel(handles, pc, rvM, rfM);
 
-[pc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc,  pointCloud(rvM));
-rvM = modelPc.Location;
+[modelMNIPoints, modelMNILabels] = loadModelMNI(mniModelPath);
+[pc, rvM, modelSphereR, modelMNIPoints] = sphereAdjustPcToModel(handles, pc, rvM, modelMNIPoints);
+setProp(handles, 'modelSphereR', modelSphereR);
+setProp(handles, 'modelMNIPoints', modelMNIPoints);
+setProp(handles, 'modelMNILabels', modelMNILabels);
 showPcAndModel(handles, pc, rvM, rfM);
 
-[pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, modelPc, rvM, rfM);
+[pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, rvM, rfM);
 setStatusText(handles, ...
     "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
     bestRmse);
@@ -194,23 +187,30 @@ modelPlot = plotMesh(fM, vM);
 drawnow;
 end
 
-function [tformedPc, modelPc, modelSphereR] = sphereAdjustPcToModel(handles, pc, modelPc)
+function [modelMNIPoints, modelMNILabels] = loadModelMNI(mniModelPath)
+load(mniModelPath, 'modelMNI');
+modelMNIPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
+modelMNILabels = modelMNI.labels;
+end
+
+function [tformedPc, vM, modelSphereR, modelMNI] = sphereAdjustPcToModel(handles, pc, vM, modelMNI)
 %SPHEREADJUSTPCTOMODEL scaled and translates the given point cloud to match
 %the model point cloud, and centers them both at the origin, based on
 %approximating spheres.
 setStatusText(handles, "Using approximating spheres to adjust point cloud to model");
-[modelSphereC, modelSphereR, scale, translate] = ...
-    sphereScaleAndTranslate(modelPc.Location, pc.Location);
-modelPc = pctransform(modelPc, affine3d(getTransformationMatrix(1, -modelSphereC)));
-tformedPc = pctransform(pc, affine3d(getTransformationMatrix(scale, ...
-    translate - modelSphereC * scale)));
+[modelSphereC, modelSphereR, scale, translate] = sphereScaleAndTranslate(vM, pc.Location);
+vM = vM - modelSphereC;
+modelMNI = modelMNI - modelSphereC;
+tformMatrix = getTransformationMatrix(scale, translate - modelSphereC * scale);
+tformedPc = pctransform(pc, affine3d(tformMatrix));
 end
 
-function [bestTformedPc, bestPrepRotation, bestScale, bestRmse] = icpAdjustPcToModel(...
-    handles, pc, modelPc, vM, fM)
+function [bestTformedPc, bestPrepRotation, bestScale, bestRmse] = icpAdjustPcToModel(handles, ...
+    pc, vM, fM)
 %ICPADJUSTPCTOMODEL 
 setStatusText(handles, "Running ICP with different starting conditions");
 
+modelPc = pointCloud(vM);
 [pc, ~, ~] = combinedRotationsICP(handles, pc, modelPc, inf, vM, fM, 2);
 
 % Binary search for another finer scaling based on ICP errors
@@ -221,11 +221,11 @@ showPcAndModel(handles, pc, vM, fM);
 % Try ICP several times with different initial rotations to try to avoid
 % local minima problems
 [pc, ~, bestPrepRotation] = singleAxisRotationsICP(...
-    handles, pc, modelPc, bestRmse, vM, fM, 15, 15, 15);
+    handles, pc, modelPc, bestRmse, vM, fM, 12, 12, 12);
 % [pc, ~, bestPrepRotation] = combinedRotationsICP(...
 %     handles, pc, modelPc, bestRmse, vM, fM, 3);
 
-[bestTformedPc, bestRmse, bestScale2] = icpFindBestScale(handles, 0.8, 1.2, pc, modelPc, 5);
+[bestTformedPc, bestRmse, bestScale2] = icpFindBestScale(handles, 0.9, 1.1, pc, modelPc, 3);
 bestScale = bestScale * bestScale2;
 end
 
@@ -430,6 +430,7 @@ function [capStars, numExistingStickers, numStarsToSelect] = calculateCapStars(h
 candidates = getStickerCandidates(pc, stickerHSV);
 capStars = getClosePointClusterCenters(candidates.Location, ...
     modelSphereR / radiusToStickerRatio, stickerMinGroupSize, false);
+setProp(handles, 'capStars', capStars);
 numExistingStickers = size(capStars, 1);
 setProp(handles, 'numExistingStickers', numExistingStickers);
 numStarsToSelect = 9 - numExistingStickers;
@@ -441,29 +442,49 @@ function select_pt_btn_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.select_pt_btn, 'Enable', 'off');
-selectedPoints = getappdata(handles.selected_pts, 'selectedPts');
+selectedPoints = getProp(handles, 'selectedPts');
 numSelected = size(selectedPoints, 1);
 numExistingStickers = getProp(handles, 'numExistingStickers');
 numLeft = 9 - numExistingStickers - numSelected;
 if numLeft > 0
     ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
-    setappdata(handles.selected_pts, 'selectedPts', [selectedPoints;ptOnModel]);
+    setProp(handles, 'selectedPts', [selectedPoints;ptOnModel]);
     delete(getProp(handles, 'ptOnModelPlot'));
+    hold on;
     scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'b');
     if numLeft > 1
         setStatusText(handles, "Found %d stickers, selected %d stickers, %d more to go", ...
-            handles.numExistingStickers, numSelected + 1, numLeft - 1);
+            numExistingStickers, numSelected + 1, numLeft - 1);
     else
         onHavingEnoughStickers(handles);
     end
 else
     setProp(handles, 'isInSelectionMode', false);
-    setStatusText(handles, "Cont.");
+    setStatusText(handles, "Labeling stickers");
     
-    load(getProp(handles, 'mniModelPath'), 'modelMNI');
-    [existStars, existLabels] = findExistingStarsAndLabels(modelMNI, missingStars);
+    modelMNIPoints = getProp(handles, 'modelMNIPoints');
+    modelMNILabels = getProp(handles, 'modelMNILabels');
+    numModelMNIPoints = size(modelMNIPoints, 1);
+    headAndCapIdxs = (numModelMNIPoints-8):numModelMNIPoints; 
+    modelStars = modelMNIPoints(headAndCapIdxs, :); % Coordinates of stars on model
+    modelStarLabels = modelMNILabels(headAndCapIdxs); % Ordered labels of stars on model
     
-    %text(ptOnModel(1), ptOnModel(2), ptOnModel(3), curLabel, 'color', [0,0,1]);
+    modelSphereR = getProp(handles, 'modelSphereR');
+    capStars = getProp(handles, 'capStars');
+    capStars = [capStars;selectedPoints];
+    mate = minDistanceMatchPoints(capStars, modelStars, modelSphereR);
+    if any(mate < 0) || length(mate) < size(capStars, 1)
+        % The case where the matching isn't complete (should occur
+        % only if some points are further apart than the sphere's
+        % radius).
+        error("Couldn't match labels to the cap stars");
+    end
+    
+    % If successful regulation parameters were found, then bestMate should be
+    % the same length as capStars, meaning we labeled all existing stars
+    capLabels = modelStarLabels(mate);
+    text(capStars(:, 1), capStars(:, 2), capStars(:, 3), capLabels, 'color', [0,0,1]);
+    setStatusText(handles, "Successfuly labeled stickers");
 end
 end
 
@@ -572,3 +593,5 @@ meshPlot = plotMesh(rfM, rvM);
 set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
 drawnow;
 end
+
+%#ok<*DEFNU>
