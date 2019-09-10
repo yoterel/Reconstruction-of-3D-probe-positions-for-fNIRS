@@ -75,6 +75,7 @@ function submitBtn_Callback(hObject, eventdata, handles)
 % hObject    handle to submitBtn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+set(hObject, 'Enable', 'off');
 videoPath = get(handles.vidPathInput, 'String');
 modelMeshPath = get(handles.modelMeshPathInput, 'String');
 vsfmPath = get(handles.vsfmPathInput, 'String');
@@ -87,7 +88,9 @@ shimadzuFilePath = get(handles.shimadzuFilePathInput, 'String');
 frameSkip = str2double(get(handles.frameSkipInput, 'String'));
 stickerMinGroupSize = str2double(get(handles.stickerMinGroupSizeInput, 'String'));
 radiusToStickerRatio = str2double(get(handles.radiusToStickerRatioInput, 'String'));
-app(videoPath, modelMeshPath, vsfmPath, nirsModelPath, spmPath, mniModelPath, spmFNIRSPath, ...
+% First parameter is nonsense to avoid stupid MATLAB warning in case it is
+% a string
+app(0, videoPath, modelMeshPath, vsfmPath, nirsModelPath, spmPath, mniModelPath, spmFNIRSPath, ...
     stickerHSVPath, shimadzuFilePath, frameSkip, stickerMinGroupSize, radiusToStickerRatio);
 
 function vidPathInput_Callback(hObject, eventdata, handles)

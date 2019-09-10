@@ -60,7 +60,8 @@ guidata(hObject, handles);
 
 % UIWAIT makes app wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
-addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', 'TriangleRayIntersection')
+addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', 'TriangleRayIntersection');
+setProp(handles, 'varargin', varargin);
 end
 
 % --- Executes on button press in start_btn.
@@ -68,24 +69,26 @@ function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-set(handles.start_btn, 'Enable', 'off');
+set(hObject, 'Enable', 'off');
 drawnow;
+varargin = getProp(handles, 'varargin');
 %modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
-modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
+%modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
+modelMeshPath = varargin{3};
 %plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
 plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
-toolPath = '"C:\Program Files\VisualSFM_windows_64bit\VisualSFM"';
-vidPath = dir('C:\Globus\emberson-consortium\VideoRecon\RESULTS\**\*.MP4');
+toolPath = sprintf('%s', varargin{4});
+vidPath = dir(varargin{2});
 vidPath = vidPath(1);
-mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
+mniModelPath = varargin{7};
 setProp(handles, 'mniModelPath', mniModelPath);
-nirsModelPath = "C:\TEMP\NIRS_adult.mat";
+nirsModelPath = varargin{5};
 setProp(handles, 'nirsModelPath', nirsModelPath);
-frameSkip = 4;
-stickerMinGroupSize = 5;
-radiusToStickerRatio = 8;
-spmPath = "C:\Users\Dean\Documents\MATLAB\spm12";
-spmFNIRSPath = "C:\Users\Dean\Documents\MATLAB\spm_fnirs";
+frameSkip = varargin{11};
+stickerMinGroupSize = varargin{12};
+radiusToStickerRatio = varargin{13};
+spmPath = varargin{6};
+spmFNIRSPath = varargin{8};
 capNetModelPath = fullfile('capnet', filesep, 'model.mat');
 
 % Name of nvm file outputed by VSFM
@@ -103,20 +106,20 @@ vsfmInputDir = fullfile(outputDir, "vsfmInput");
 %plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
 %    frameSkip);
 
+% TODO: decide if in video foler or not
 % Video folder should also contain a stickerHSV.txt file, which contains a
 % noramlized (between 0 and 1) HSV representation of the model's sticker's
 % color, and an infant.txt file (the Shimadzu output file)
-vidDir = vidPath.folder;
+%vidDir = vidPath.folder;
 %stickerHSVPath = strcat(vidDir, filesep, "stickerHSV.txt");
-stickerHSVPath = "C:\TEMP\stickerHSV.txt";
+stickerHSVPath = varargin{9};
 load(stickerHSVPath, 'stickerHSV');
 % Path of the shimadzu output file
-shimadzuFilePath = "C:\TEMP\adult.txt";
+shimadzuFilePath = varargin{10};
 %shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
 
 plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
 addpath(spmPath, genpath(spmFNIRSPath));
-setStatusText(handles, "Converting .ply file to .pos file");
 
 setStatusText(handles, "Reading generated ply file");
 pc = structToPointCloud(plyread(plyFilePath));
