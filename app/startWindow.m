@@ -22,7 +22,7 @@ function varargout = startWindow(varargin)
 
 % Edit the above text to modify the response to help startWindow
 
-% Last Modified by GUIDE v2.5 10-Sep-2019 11:14:27
+% Last Modified by GUIDE v2.5 10-Sep-2019 11:48:19
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -43,7 +43,6 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-
 % --- Executes just before startWindow is made visible.
 function startWindow_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -61,7 +60,6 @@ guidata(hObject, handles);
 % UIWAIT makes startWindow wait for user response (see UIRESUME)
 % uiwait(handles.startWindow);
 
-
 % --- Outputs from this function are returned to the command line.
 function varargout = startWindow_OutputFcn(hObject, eventdata, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
@@ -72,61 +70,25 @@ function varargout = startWindow_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
-
 % --- Executes on button press in submitBtn.
 function submitBtn_Callback(hObject, eventdata, handles)
 % hObject    handle to submitBtn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-app("Hello world");
-
-
-
-function modelMeshInput_Callback(hObject, eventdata, handles)
-% hObject    handle to modelMeshInput (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of modelMeshInput as text
-%        str2double(get(hObject,'String')) returns contents of modelMeshInput as a double
-
-
-% --- Executes during object creation, after setting all properties.
-function modelMeshInput_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to modelMeshInput (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function vsfmPath_Callback(hObject, eventdata, handles)
-% hObject    handle to vsfmPath (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of vsfmPath as text
-%        str2double(get(hObject,'String')) returns contents of vsfmPath as a double
-
-
-% --- Executes during object creation, after setting all properties.
-function vsfmPath_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to vsfmPath (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
+videoPath = get(handles.vidPathInput, 'String');
+modelMeshPath = get(handles.modelMeshPathInput, 'String');
+vsfmPath = get(handles.vsfmPathInput, 'String');
+nirsModelPath = get(handles.nirsModelPathInput, 'String');
+spmPath = get(handles.spmPathInput, 'String');
+mniModelPath = get(handles.mniModelPathInput, 'String');
+spmFNIRSPath = get(handles.spmFNIRSPathInput, 'String');
+stickerHSVPath = get(handles.stickerHSVPathInput, 'String');
+shimadzuFilePath = get(handles.shimadzuFilePathInput, 'String');
+frameSkip = str2double(get(handles.frameSkipInput, 'String'));
+stickerMinGroupSize = str2double(get(handles.stickerMinGroupSizeInput, 'String'));
+radiusToStickerRatio = str2double(get(handles.radiusToStickerRatioInput, 'String'));
+app(videoPath, modelMeshPath, vsfmPath, nirsModelPath, spmPath, mniModelPath, spmFNIRSPath, ...
+    stickerHSVPath, shimadzuFilePath, frameSkip, stickerMinGroupSize, radiusToStickerRatio);
 
 function vidPathInput_Callback(hObject, eventdata, handles)
 % hObject    handle to vidPathInput (see GCBO)
@@ -135,7 +97,6 @@ function vidPathInput_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of vidPathInput as text
 %        str2double(get(hObject,'String')) returns contents of vidPathInput as a double
-
 
 % --- Executes during object creation, after setting all properties.
 function vidPathInput_CreateFcn(hObject, eventdata, handles)
@@ -149,8 +110,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
 function mniModelPathInput_Callback(hObject, eventdata, handles)
 % hObject    handle to mniModelPathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -158,7 +117,6 @@ function mniModelPathInput_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of mniModelPathInput as text
 %        str2double(get(hObject,'String')) returns contents of mniModelPathInput as a double
-
 
 % --- Executes during object creation, after setting all properties.
 function mniModelPathInput_CreateFcn(hObject, eventdata, handles)
@@ -172,8 +130,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
 function nirsModelPathInput_Callback(hObject, eventdata, handles)
 % hObject    handle to nirsModelPathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -181,7 +137,6 @@ function nirsModelPathInput_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of nirsModelPathInput as text
 %        str2double(get(hObject,'String')) returns contents of nirsModelPathInput as a double
-
 
 % --- Executes during object creation, after setting all properties.
 function nirsModelPathInput_CreateFcn(hObject, eventdata, handles)
@@ -195,20 +150,138 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
-function edit6_Callback(hObject, eventdata, handles)
-% hObject    handle to edit6 (see GCBO)
+function spmPathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to spmPathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of edit6 as text
-%        str2double(get(hObject,'String')) returns contents of edit6 as a double
+% Hints: get(hObject,'String') returns contents of spmPathInput as text
+%        str2double(get(hObject,'String')) returns contents of spmPathInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function spmPathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to spmPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function frameSkipInput_Callback(hObject, eventdata, handles)
+% hObject    handle to frameSkipInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of frameSkipInput as text
+%        str2double(get(hObject,'String')) returns contents of frameSkipInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function frameSkipInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to frameSkipInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function stickerMinGroupSizeInput_Callback(hObject, eventdata, handles)
+% hObject    handle to stickerMinGroupSizeInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of stickerMinGroupSizeInput as text
+%        str2double(get(hObject,'String')) returns contents of stickerMinGroupSizeInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function stickerMinGroupSizeInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stickerMinGroupSizeInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function radiusToStickerRatioInput_Callback(hObject, eventdata, handles)
+% hObject    handle to radiusToStickerRatioInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of radiusToStickerRatioInput as text
+%        str2double(get(hObject,'String')) returns contents of radiusToStickerRatioInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function radiusToStickerRatioInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to radiusToStickerRatioInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function spmFNIRSPathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to spmFNIRSPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of spmFNIRSPathInput as text
+%        str2double(get(hObject,'String')) returns contents of spmFNIRSPathInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function spmFNIRSPathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to spmFNIRSPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function stickerHSVPathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to stickerHSVPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of stickerHSVPathInput as text
+%        str2double(get(hObject,'String')) returns contents of stickerHSVPathInput as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function edit6_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit6 (see GCBO)
+function stickerHSVPathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stickerHSVPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function shimadzuFilePathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to shimadzuFilePathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of shimadzuFilePathInput as text
+%        str2double(get(hObject,'String')) returns contents of shimadzuFilePathInput as a double
+
+% --- Executes during object creation, after setting all properties.
+function shimadzuFilePathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to shimadzuFilePathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -220,18 +293,41 @@ end
 
 
 
-function frameSkipInput_Callback(hObject, eventdata, handles)
-% hObject    handle to frameSkipInput (see GCBO)
+function vsfmPathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to vsfmPathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of frameSkipInput as text
-%        str2double(get(hObject,'String')) returns contents of frameSkipInput as a double
+% Hints: get(hObject,'String') returns contents of vsfmPathInput as text
+%        str2double(get(hObject,'String')) returns contents of vsfmPathInput as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function frameSkipInput_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to frameSkipInput (see GCBO)
+function vsfmPathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to vsfmPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function modelMeshPathInput_Callback(hObject, eventdata, handles)
+% hObject    handle to modelMeshPathInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of modelMeshPathInput as text
+%        str2double(get(hObject,'String')) returns contents of modelMeshPathInput as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function modelMeshPathInput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to modelMeshPathInput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 

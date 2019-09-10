@@ -63,98 +63,11 @@ guidata(hObject, handles);
 addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', 'TriangleRayIntersection')
 end
 
-% --- Outputs from this function are returned to the command line.
-function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
-% varargout  cell array for returning output args (see VARARGOUT);
-% hObject    handle to figure
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Get default command line output from handles structure
-varargout{1} = handles.output;
-end
-
-function pc_on_model_demo(handles)
-resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
-cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
-reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
-hold on;
-pc = pcread(cleanedVidPlyPath);
-pcshow(pc);
-camlight('headlight');
-mesh = plyread(reconstructedPlyPath);
-[rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
-vert1 = rvM(rfM(:,1),:);
-vert2 = rvM(rfM(:,2),:);
-vert3 = rvM(rfM(:,3),:);
-
-function selectPointOnMesh(~, ~)
-    hold on;
-    clickedPt = get(gca,'CurrentPoint');
-    msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
-        clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
-        clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
-    setStatusText(handles, msg);
-    
-    if (isfield(handles, 'front_pt'))
-        delete(handles.front_pt);
-    end
-    handles.front_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
-    
-    if (isfield(handles, 'back_pt'))
-        delete(handles.back_pt);
-    end
-    handles.back_pt = scatter3(clickedPt(2,1), clickedPt(2,2), clickedPt(2,3), 'filled', 'b');
-    
-    orig = clickedPt(1,:);
-    dir = clickedPt(2,:) - orig;
-    
-    if isfield(handles, 'line')
-        delete(handles.line);
-    end
-    handles.line = line('XData' ,orig(1)+[0 dir(1)], 'YData', orig(2)+[0 dir(2)], 'ZData', ...
-        orig(3)+[0 dir(3)], 'Color', 'r', 'LineWidth', 3);
-    
-    [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
-        orig, dir, vert1, vert2, vert3);
-    if (isfield(handles, 'intersection'))
-        delete(handles.intersection);
-    end
-    intersections = intersections(intersectionsMask, :);
-    if size(intersections, 1) >= 1
-        intersection = intersections(1, :);
-        handles.intersection = scatter3(...
-            intersection(1), intersection(2), intersection(3), 'filled', 'g');
-    end
-end
-
-meshPlot = plotMesh(rfM, rvM);
-set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
-drawnow;
-end
-
-function compare_pc_and_model(handles, plyFilePath, modelMeshPath)
-setStatusText(handles, "Reading generated ply file");
-pc = structToPointCloud(plyread(plyFilePath));
-setStatusText(handles, "Reading model mesh");
-modelMesh = plyread(modelMeshPath);
-setStatusText(handles, "Plotting pc and mesh");
-vM = verticesArr(modelMesh);
-fM = facesArr(modelMesh);
-pcshow(pc);
-allowSelectionOnModelMesh(handles, fM, vM);
-drawnow;
-end
-
 % --- Executes on button press in start_btn.
 function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % hObject    handle to start_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-addpath('app');
-initialInput();
-end
-function foo()
 set(handles.start_btn, 'Enable', 'off');
 drawnow;
 %modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
@@ -602,4 +515,87 @@ function point_label_popup_CreateFcn(hObject, ~, ~)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+end
+
+% --- Outputs from this function are returned to the command line.
+function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+end
+
+function compare_pc_and_model(handles, plyFilePath, modelMeshPath)
+setStatusText(handles, "Reading generated ply file");
+pc = structToPointCloud(plyread(plyFilePath));
+setStatusText(handles, "Reading model mesh");
+modelMesh = plyread(modelMeshPath);
+setStatusText(handles, "Plotting pc and mesh");
+vM = verticesArr(modelMesh);
+fM = facesArr(modelMesh);
+pcshow(pc);
+allowSelectionOnModelMesh(handles, fM, vM);
+drawnow;
+end
+
+function pc_on_model_demo(handles)
+resultsDir = "C:\GIT\CapNet\results\adult14_stride_5";
+cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
+reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
+hold on;
+pc = pcread(cleanedVidPlyPath);
+pcshow(pc);
+camlight('headlight');
+mesh = plyread(reconstructedPlyPath);
+[rfM, rvM] = reducepatch(facesArr(mesh), verticesArr(mesh), 5000);
+vert1 = rvM(rfM(:,1),:);
+vert2 = rvM(rfM(:,2),:);
+vert3 = rvM(rfM(:,3),:);
+
+function selectPointOnMesh(~, ~)
+    hold on;
+    clickedPt = get(gca,'CurrentPoint');
+    msg = sprintf("[%.3f,%.3f,%.3f]\n[%.3f,%.3f,%.3f]", ...
+        clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), ...
+        clickedPt(2,1), clickedPt(2,2), clickedPt(2,3)); 
+    setStatusText(handles, msg);
+    
+    if (isfield(handles, 'front_pt'))
+        delete(handles.front_pt);
+    end
+    handles.front_pt = scatter3(clickedPt(1,1), clickedPt(1,2), clickedPt(1,3), 'filled', 'r');
+    
+    if (isfield(handles, 'back_pt'))
+        delete(handles.back_pt);
+    end
+    handles.back_pt = scatter3(clickedPt(2,1), clickedPt(2,2), clickedPt(2,3), 'filled', 'b');
+    
+    orig = clickedPt(1,:);
+    dir = clickedPt(2,:) - orig;
+    
+    if isfield(handles, 'line')
+        delete(handles.line);
+    end
+    handles.line = line('XData' ,orig(1)+[0 dir(1)], 'YData', orig(2)+[0 dir(2)], 'ZData', ...
+        orig(3)+[0 dir(3)], 'Color', 'r', 'LineWidth', 3);
+    
+    [intersectionsMask, ~, ~, ~, intersections] = TriangleRayIntersection(...
+        orig, dir, vert1, vert2, vert3);
+    if (isfield(handles, 'intersection'))
+        delete(handles.intersection);
+    end
+    intersections = intersections(intersectionsMask, :);
+    if size(intersections, 1) >= 1
+        intersection = intersections(1, :);
+        handles.intersection = scatter3(...
+            intersection(1), intersection(2), intersection(3), 'filled', 'g');
+    end
+end
+
+meshPlot = plotMesh(rfM, rvM);
+set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
+drawnow;
 end
