@@ -10,8 +10,11 @@ stickerMinGroupSize = 5;
 fprintf("Reading ply file\n");
 pc = pcread(plyFilePath);
 
+% Some of the models contain green points which are also noise, so a
+% stricter than usual thershold for counting as sticker candidates (in
+% terms of hue) is used here.
 load(stickerHSVPath, 'stickerHSV');
-candidatesPc = getStickerCandidates(pc, stickerHSV);
+candidatesPc = getStickerCandidates(pc, stickerHSV, 0.1); 
 candidates = candidatesPc.Location;
 fprintf("Found sticker candidate vertices\n");
 
