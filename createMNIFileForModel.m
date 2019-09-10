@@ -1,10 +1,11 @@
-mniModelDir = "C:\Globus\emberson-consortium\VideoRecon\MATLAB";
-mniModelFileName = "FixModelMNI.mat";
-mniModelPath = fullfile(mniModelDir, mniModelFileName);
-plyFilePath = "C:\TEMP\SagiUpdatedAdultCleaned-1.4-3.ply";
+mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
+plyFileDir = "C:\TEMP";
+plyFileName = "SagiUpdatedAdultCleaned-1.4-3.ply";
+outputFileName = "NewModelMNI.mat";
+plyFilePath = fullfile(plyFileDir, plyFileName);
 stickerHSVPath = "C:\TEMP\stickerHSV.txt";
-radiusToStickerRatio = 10;
-stickerMinGroupSize = 50; % This should be high in carefully constructed model plys
+radiusToStickerRatio = 5;
+stickerMinGroupSize = 5;
 
 fprintf("Reading ply file\n");
 pc = pcread(plyFilePath);
@@ -18,8 +19,8 @@ fprintf("Found sticker candidate vertices\n");
 % candidate vertices on the cap (one can scale modelStars instead, as done before in a comment)
 load(mniModelPath, 'modelMNI');
 modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
-[~, modelSphereR, scale, translate] = sphereScaleAndTranslate(modelPoints, candidates);
-candidates = candidates * scale + translate;
+[~, modelSphereR, scale, translate] = sphereScaleAndTranslate(candidates, modelPoints);
+modelPoints = modelPoints * scale + translate;
 fprintf("Used approximating spheres to scale and translate candidate sticker points\n");
 
 plyStars = getClosePointClusterCenters(candidates, modelSphereR / radiusToStickerRatio, ...
@@ -35,12 +36,12 @@ if numFoundStars ~= expectedNumStars
 end
 
 headAndCapIdxs = (size(modelMNI, 1)-expectedNumStars+1):size(modelMNI, 1); 
-modelStars = table2array(modelMNI(headAndCapIdxs, 2:4)); % Coordinates of stars on model
+modelStars = modelPoints(headAndCapIdxs, :); % Coordinates of stars on model
 modelStarLabels = modelMNI.labels(headAndCapIdxs); % Ordered labels of stars on model
 
 [bestRegParams, bestProjStars, bestMate, bestDistance] = ...
     calculateBestRegParams(modelStars, plyStars, modelSphereR);
-%save("C:\temp\createmniformodel.mat");
+save("C:\temp\createmniformodel.mat");
 %load("C:\temp\createmniformodel.mat", 'bestRegParams', 'bestProjStars', 'bestMate', 'bestDistance');
 if bestDistance == inf
     error("No sufficiently accurate regulation parameters could be found");
@@ -49,16 +50,16 @@ end
 % If successful regulation parameters were found, then bestMate should be
 % the same length as capStars, meaning we labeled all existing stars
 plyLabels = modelStarLabels(bestMate);
-plotAdjustedModelVsCap(plyStars, plyLabels, bestProjStars, modelStarLabels);
+plotAdjustedModelVsCap(plyStars, plyLabels, double(bestProjStars), modelStarLabels);
 
 fprintf("Applying calculated transformation to the rest of the model points\n");
-transformedModelPoints = applyRegParams(table2array(modelMNI(:, 2:4)), bestRegParams);
+transformedModelPoints = applyRegParams(modelPoints, bestRegParams);
 labels = modelMNI.labels;
 X = transformedModelPoints(:,1);
 Y = transformedModelPoints(:,2);
 Z = transformedModelPoints(:,3);
 modelMNI = table(labels, X, Y, Z);
-save(fullfile(mniModelDir, "NewModel.mat"), 'modelMNI');
+save(fullfile(plyFileDir, outputFileName), 'modelMNI');
 fprintf("Saved new model MNI file to disk\n");
 
 function [bestRegParams, bestProjStars, bestMate, bestDistance] = calculateBestRegParams(...
@@ -138,7 +139,6 @@ end
 transformed = [points, ones(size(points, 1), 1)] * transformationMatrix;
 transformed = transformed(:, 1:3);
 end
-
 
 function [] = plotAdjustedModelVsCap(plyStars, plyLabels, bestProjStars, modelStarLabels)
 % PLOTADJUSTEDMODELVSCAP Plot the cap labels (blue circles) vs. adjusted model labels (red stars) 
