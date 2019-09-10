@@ -22,7 +22,7 @@ function varargout = app(varargin)
 
 % Edit the above text to modify the response to help app
 
-% Last Modified by GUIDE v2.5 01-Sep-2019 15:02:14
+% Last Modified by GUIDE v2.5 10-Sep-2019 13:59:06
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -60,7 +60,8 @@ guidata(hObject, handles);
 
 % UIWAIT makes app wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
-addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', 'TriangleRayIntersection');
+addpath('helper_functions', 'capnet', 'sticker_classifier', 'plyToPos', ...
+    'app/TriangleRayIntersection');
 setProp(handles, 'varargin', varargin);
 end
 
@@ -71,6 +72,17 @@ function start_btn_Callback(hObject, eventdata, handles) %#ok<*DEFNU>
 % handles    structure with handles and user data (see GUIDATA)
 set(hObject, 'Enable', 'off');
 drawnow;
+end
+
+% --- Outputs from this function are returned to the command line.
+function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
 varargin = getProp(handles, 'varargin');
 %modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
 %modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
@@ -433,15 +445,11 @@ selectedPoints = getappdata(handles.selected_pts, 'selectedPts');
 numSelected = size(selectedPoints, 1);
 numExistingStickers = getProp(handles, 'numExistingStickers');
 numLeft = 9 - numExistingStickers - numSelected;
-missingStars = getProp(handles, 'missingStars');
 if numLeft > 0
     ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
     setappdata(handles.selected_pts, 'selectedPts', [selectedPoints;ptOnModel]);
     delete(getProp(handles, 'ptOnModelPlot'));
     scatter3(ptOnModel(1), ptOnModel(2), ptOnModel(3), 'filled', 'b');
-    curLabel = currentPointLabel(handles);
-    setProp(handles, 'missingStars', [missingStars, curLabel]);
-    text(ptOnModel(1), ptOnModel(2), ptOnModel(3), curLabel, 'color', [0,0,1]);
     if numLeft > 1
         setStatusText(handles, "Found %d stickers, selected %d stickers, %d more to go", ...
             handles.numExistingStickers, numSelected + 1, numLeft - 1);
@@ -454,6 +462,8 @@ else
     
     load(getProp(handles, 'mniModelPath'), 'modelMNI');
     [existStars, existLabels] = findExistingStarsAndLabels(modelMNI, missingStars);
+    
+    %text(ptOnModel(1), ptOnModel(2), ptOnModel(3), curLabel, 'color', [0,0,1]);
 end
 end
 
@@ -489,46 +499,6 @@ end
 
 function setProp(handles, name, val)
 setappdata(handles.selected_pts, name, val);
-end
-
-% --- Executes on selection change in point_label_popup.
-function point_label_popup_Callback(~, ~, ~)
-% hObject    handle to point_label_popup (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns point_label_popup contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from point_label_popup
-end
-
-function label = currentPointLabel(handles)
-pointLabelPopup = handles.point_label_popup;
-contents = cellstr(get(pointLabelPopup, 'String'));
-label = contents{get(pointLabelPopup, 'Value')};
-end
-
-% --- Executes during object creation, after setting all properties.
-function point_label_popup_CreateFcn(hObject, ~, ~)
-% hObject    handle to point_label_popup (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: popupmenu controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-end
-
-% --- Outputs from this function are returned to the command line.
-function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
-% varargout  cell array for returning output args (see VARARGOUT);
-% hObject    handle to figure
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Get default command line output from handles structure
-varargout{1} = handles.output;
 end
 
 function compare_pc_and_model(handles, plyFilePath, modelMeshPath)

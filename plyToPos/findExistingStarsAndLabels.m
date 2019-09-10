@@ -9,6 +9,5 @@ modelStarLabels = modelMNI.labels(headAndCapIdxs); % Ordered labels of stars on 
 
 existStarsBitVec = ~ismember(modelStarLabels, missingStars);
 existStars = modelStars(existStarsBitVec, :);
-%existStars = existStars - mean(existStars);
 existLabels = modelStarLabels(existStarsBitVec);
 end
