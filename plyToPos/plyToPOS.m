@@ -113,7 +113,7 @@ modelOnCap = applyRegParams(modelPoints, modelReg);
 graphResults(modelHead, capHead, modelOnCap, capCap, modelPoints, modelCapIdxs);
 [subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, capHead, modelHeadIdxs);
 createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelLabels, subX, subY, subZ);
-    
+
 close all
 end
 
@@ -217,17 +217,6 @@ fprintf("Total time spent in loop: %f, total time spent in minDistanceMatchPoint
     totalLoopElapsed, minDistanceMatchElapsed);
 end
 
-function [transformed] = applyRegParams(points, regParams, invert)
-% APPLYREGPARAMS transforms the given set of points using the given
-% regParams struct (usually returned from absor)
-transformationMatrix = regParams.M';
-if (nargin > 2 && invert)
-    transformationMatrix = transformationMatrix^-1;
-end
-transformed = [points, ones(size(points, 1), 1)] * transformationMatrix;
-transformed = transformed(:, 1:3);
-end
-
 function [] = plotAdjustedModelVsCap(capStars, capLabels, bestProjStars, existLabels)
 % PLOTADJUSTEDMODELVSCAP Plot the cap labels (blue circles) vs. adjusted model labels (red stars) 
 figure; hold on; axis equal;
@@ -235,37 +224,6 @@ plot3(capStars(:,1),capStars(:,2),capStars(:,3),'ob')
 text(capStars(:,1),capStars(:,2),capStars(:,3),capLabels,'color',[0,0,1])
 plot3(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),'pr')
 text(bestProjStars(:,1),bestProjStars(:,2),bestProjStars(:,3),existLabels,'color',[1,0,0])
-end
-
-function [bestReg, transformedCapHead, bestScale] = findHeadTransformation(capHead, modelHead)
-% FINDOPTIMALSCALING Finds the best scaling, rotation and translation parameters for fitting the
-%   current cap head stars to the model stars
-% Perform grid search of axis-aligned scaling, using only the head points,
-% and realign at each step.
-fprintf("Finding optimal scaling parameters\n");
-scalespace = logspace(log10(0.5),log10(2),20);
-bestD = inf;
-for scX = scalespace
-    for scY = scalespace
-        for scZ = scalespace
-            testCapHead = capHead.*[scX,scY,scZ]; % implicit expansion
-            testReg = absor(testCapHead', modelHead');
-            testCapHead = applyRegParams(testCapHead, testReg);
-            testCapHead = testCapHead(:,1:3);
-            % TODO: maybe not needed, need to use the labels
-            [~,d] = knnsearch(modelHead, testCapHead); 
-            %if sum(d) < bestD && (length(idx) == length(unique(idx)) || size(capStars,1) > size(existStars,1))
-            %if ( cost < bestD )
-            cost = sum(d.^2);
-            if cost < bestD
-                bestReg = testReg;
-                transformedCapHead = testCapHead;
-                bestScale = [scX,scY,scZ];
-                bestD = cost;
-            end
-        end
-    end
-end
 end
 
 % TODO: this is the graph that looks like a point cloud of the entire head.
@@ -279,16 +237,4 @@ scatter3(bestCapHead(:,1),bestCapHead(:,2),bestCapHead(:,3))
 scatter3(modelOnCapCap(:,1),modelOnCapCap(:,2),modelOnCapCap(:,3))
 scatter3(capCap(:,1),capCap(:,2),capCap(:,3))
 scatter3(modelPoints(modelCapIdxs,1),modelPoints(modelCapIdxs,2),modelPoints(modelCapIdxs,3))
-end
-
-function [subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, bestCapHead, modelHeadIdxs)
-% GETCAPONHEADPOSITIONS returns x,y,z coordinates of model points
-% where the coordinates of the points on the head in the model were
-% replaced with the actual positions of the head relative to the cap
-subX = modelOnCap(:,1);
-subY = modelOnCap(:,2);
-subZ = modelOnCap(:,3);
-subX(modelHeadIdxs) = bestCapHead(:, 1);
-subY(modelHeadIdxs) = bestCapHead(:, 2);
-subZ(modelHeadIdxs) = bestCapHead(:, 3);
 end
