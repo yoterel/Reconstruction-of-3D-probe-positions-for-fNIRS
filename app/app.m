@@ -102,9 +102,10 @@ setStatusText(handles, "Loading CapNet data");
 
 % TODO: use video name/date for output folder?
 % Create output directory if needed
-outputDir = sprintf('%s%sresults%sadult_stride_%d', ...
-    pwd, filesep, filesep, frameSkip+1);
-vsfmInputDir = fullfile(outputDir, "vsfmInput");
+outputDir = sprintf('%s%sresults%sadult_stride_%d', pwd, filesep, filesep, frameSkip+1);
+plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
+setProp(handles, 'outputDir', plyToPosOutputDir);
+%vsfmInputDir = fullfile(outputDir, "vsfmInput");
 %plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
 %    frameSkip);
 
@@ -119,8 +120,8 @@ load(stickerHSVPath, 'stickerHSV');
 % Path of the shimadzu output file
 shimadzuFilePath = varargin{10};
 %shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
+setProp(handles, 'shimadzuFilePath', shimadzuFilePath);
 
-plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
 addpath(spmPath, genpath(spmFNIRSPath));
 
 setStatusText(handles, "Reading generated ply file");
@@ -459,33 +460,89 @@ if numLeft > 0
         onHavingEnoughStickers(handles);
     end
 else
-    setProp(handles, 'isInSelectionMode', false);
-    setStatusText(handles, "Labeling stickers");
-    
-    modelMNIPoints = getProp(handles, 'modelMNIPoints');
-    modelMNILabels = getProp(handles, 'modelMNILabels');
-    numModelMNIPoints = size(modelMNIPoints, 1);
-    headAndCapIdxs = (numModelMNIPoints-8):numModelMNIPoints; 
-    modelStars = modelMNIPoints(headAndCapIdxs, :); % Coordinates of stars on model
-    modelStarLabels = modelMNILabels(headAndCapIdxs); % Ordered labels of stars on model
-    
-    modelSphereR = getProp(handles, 'modelSphereR');
-    capStars = getProp(handles, 'capStars');
-    capStars = [capStars;selectedPoints];
-    mate = minDistanceMatchPoints(capStars, modelStars, modelSphereR);
-    if any(mate < 0) || length(mate) < size(capStars, 1)
-        % The case where the matching isn't complete (should occur
-        % only if some points are further apart than the sphere's
-        % radius).
-        error("Couldn't match labels to the cap stars");
-    end
-    
-    % If successful regulation parameters were found, then bestMate should be
-    % the same length as capStars, meaning we labeled all existing stars
-    capLabels = modelStarLabels(mate);
-    text(capStars(:, 1), capStars(:, 2), capStars(:, 3), capLabels, 'color', [0,0,1]);
-    setStatusText(handles, "Successfuly labeled stickers");
+    onConfirmedAllStarSelections(handles, selectedPoints, numSelected);
 end
+end
+
+function onConfirmedAllStarSelections(handles, selectedPoints, numSelected)
+setProp(handles, 'isInSelectionMode', false);
+setStatusText(handles, "Labeling stickers");
+
+modelMNIPoints = getProp(handles, 'modelMNIPoints');
+modelMNILabels = getProp(handles, 'modelMNILabels');
+numModelMNIPoints = size(modelMNIPoints, 1);
+headAndCapIdxs = (numModelMNIPoints-8):numModelMNIPoints; 
+modelStars = modelMNIPoints(headAndCapIdxs, :); % Coordinates of stars on model
+modelStarLabels = modelMNILabels(headAndCapIdxs); % Ordered labels of stars on model
+
+modelSphereR = getProp(handles, 'modelSphereR');
+capStars = getProp(handles, 'capStars');
+capStars = [capStars;selectedPoints];
+mate = minDistanceMatchPoints(capStars, modelStars, modelSphereR);
+if any(mate < 0) || length(mate) < size(capStars, 1)
+    % The case where the matching isn't complete (should occur
+    % only if some points are further apart than the sphere's
+    % radius).
+    error("Couldn't match labels to the cap stars");
+end
+
+% If successful regulation parameters were found, then bestMate should be
+% the same length as capStars, meaning we labeled all existing stars
+capLabels = modelStarLabels(mate);
+text(capStars(:, 1), capStars(:, 2), capStars(:, 3), capLabels, 'color', [0,0,1]);
+setStatusText(handles, ...
+    "Successfuly labeled stickers, performing grid search of axis-aligned scaling");
+
+% Discard manually selected stickers for the upcoming optimizations
+numExisting = 9 - numSelected;
+missingStars = capLabels((numExisting + 1):9);
+capLabels = capLabels(1:numExisting);
+existStarsBitVec = ~ismember(modelStarLabels, missingStars);
+existLabels = modelStarLabels(existStarsBitVec);
+
+% reorder capStars and capLabels according to modelLabels
+tempCapStars = capStars;
+for i = 1:length(existLabels)
+    capStars(i,:) = tempCapStars(strcmp(capLabels, existLabels{i}), :);
+end
+capLabels = existLabels;
+
+% TODO: use consts for point labels?
+headLabelNames = {'Nz', 'Cz', 'AR', 'AL'};
+capHeadIdxs = ismember(capLabels, headLabelNames);
+existPointsBitVec = ~ismember(modelMNILabels, missingStars);
+modelHeadIdxs = ismember(modelMNILabels, headLabelNames) & existPointsBitVec;
+capLabelNames = {'Front', 'Cz', 'Right', 'Left', 'Pz', 'Iz'};
+capCapIdxs = ismember(capLabels, capLabelNames);
+modelCapIdxs = ismember(modelMNILabels, capLabelNames) & existPointsBitVec;
+capHead = capStars(capHeadIdxs,:);
+modelHead = modelMNIPoints(modelHeadIdxs,:);
+[bestReg, capHead, bestScale] = findHeadTransformation(capHead, modelHead);
+setStatusText(handles, 'Applying calculated transformations');
+capStars = applyRegParams(capStars.*bestScale, bestReg);
+
+% rotate scaled model to match the best to the CAP POINTS ONLY.
+modelCap = modelMNIPoints(modelCapIdxs,:);
+modelStarsToErase = true(length(modelCap(:,1)),1);
+capCapLabels = capLabels(capCapIdxs);
+modelCapLabels = modelMNILabels(modelCapIdxs);
+for i = 1:size(modelCapLabels,1)
+    if any(ismember(capCapLabels, modelCapLabels{i}))
+        modelStarsToErase(i) = false;
+    end
+end
+modelCap(modelStarsToErase,:) = [];
+capCap = capStars(capCapIdxs,:);
+[modelReg, ~] = absor(modelCap',capCap');
+modelOnCap = applyRegParams(modelMNIPoints, modelReg);
+
+[subX, subY, subZ] = getCapOnHeadPositions(modelOnCap, capHead, modelHeadIdxs);
+shimadzuFilePath = getProp(handles, 'shimadzuFilePath');
+nirsModelPath = getProp(handles, 'nirsModelPath');
+outputDir = getProp(handles, 'outputDir');
+setStatusText(handles, "Final preparations + running spm to create POS file");
+clf;
+createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelMNILabels, subX, subY, subZ);
 end
 
 function onHavingEnoughStickers(handles)
