@@ -22,7 +22,7 @@ function varargout = startWindow(varargin)
 
 % Edit the above text to modify the response to help startWindow
 
-% Last Modified by GUIDE v2.5 11-Sep-2019 12:22:21
+% Last Modified by GUIDE v2.5 11-Sep-2019 12:34:17
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -89,10 +89,12 @@ shimadzuFilePath = get(handles.shimadzuFilePathInput, 'String');
 frameSkip = str2double(get(handles.frameSkipInput, 'String'));
 stickerMinGroupSize = str2double(get(handles.stickerMinGroupSizeInput, 'String'));
 radiusToStickerRatio = str2double(get(handles.radiusToStickerRatioInput, 'String'));
+outputDir = get(handles.outputDirInput, 'String');
 % First parameter is nonsense to avoid stupid MATLAB warning in case it is
 % a string
 app(0, videoPath, modelMeshPath, vsfmPath, nirsModelPath, spmPath, mniModelPath, spmFNIRSPath, ...
-    stickerHSVPath, shimadzuFilePath, frameSkip, stickerMinGroupSize, radiusToStickerRatio);
+    stickerHSVPath, shimadzuFilePath, frameSkip, stickerMinGroupSize, radiusToStickerRatio, ...
+    outputDir);
 
 function vidPathInput_Callback(~, ~, ~)
 % hObject    handle to vidPathInput (see GCBO)
@@ -298,16 +300,24 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+function browseFile(input, fileExt)
+[file, path, ~] = uigetfile("*." + fileExt);
+if file ~= 0
+    set(input, 'String', fullfile(path, file));
+end
+
+function browseDir(input)
+dir = uigetdir;
+if dir ~= 0
+    set(input, 'String', dir);
+end
+
 % --- Executes on button press in browseModelMesh.
 function browseModelMesh_Callback(~, ~, handles)
 % hObject    handle to browseModelMesh (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-[file, path, ~] = uigetfile('*.ply');
-if file == 0
-    return;
-end
-set(handles.modelMeshPathInput, 'String', fullfile(path, file));
+browseFile(handles.modelMeshPathInput, 'ply');
 
 function outputDirInput_Callback(~, ~, ~)
 % hObject    handle to outputDirInput (see GCBO)
@@ -325,3 +335,66 @@ function outputDirInput_CreateFcn(hObject, ~, ~)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+% --- Executes on button press in browseVideo.
+function browseVideo_Callback(~, ~, handles)
+% hObject    handle to browseVideo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseFile(handles.vidPathInput, '.mp4');
+
+% --- Executes on button press in browseSPM.
+function browseSPM_Callback(~, ~, handles)
+% hObject    handle to browseSPM (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseDir(handles.spmPathInput);
+
+% --- Executes on button press in browseVSFM.
+function browseVSFM_Callback(~, ~, handles)
+% hObject    handle to browseVSFM (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseDir(handles.vsfmPathInput);
+
+% --- Executes on button press in browseNIRSModel.
+function browseNIRSModel_Callback(~, ~, handles)
+% hObject    handle to browseNIRSModel (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseFile(handles.nirsModelPathInput, 'mat');
+
+% --- Executes on button press in browseMNIModel.
+function browseMNIModel_Callback(~, ~, handles)
+% hObject    handle to browseMNIModel (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseFile(handles.mniModelPathInput, 'mat');
+
+% --- Executes on button press in browseOutputDir.
+function browseOutputDir_Callback(~, ~, handles)
+% hObject    handle to browseOutputDir (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseDir(handles.outputDirInput);
+
+% --- Executes on button press in browseSPMFNIRS.
+function browseSPMFNIRS_Callback(~, ~, handles)
+% hObject    handle to browseSPMFNIRS (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseDir(handles.spmFNIRSPathInput);
+
+% --- Executes on button press in browseShimadzuFile.
+function browseShimadzuFile_Callback(~, ~, handles)
+% hObject    handle to browseShimadzuFile (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseFile(handles.shimadzuFilePathInput, "txt");
+
+% --- Executes on button press in browseStickerHSV.
+function browseStickerHSV_Callback(~, ~, handles)
+% hObject    handle to browseStickerHSV (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+browseFile(handles.stickerHSVPathInput, "txt");
