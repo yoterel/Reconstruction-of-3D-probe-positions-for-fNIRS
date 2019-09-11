@@ -1,10 +1,10 @@
 function makeListAndConnection(pathname, framerate, skip_frames, imgResultFilePrefix, ...
-    connectionsFileName)
+    connectionsFileName, logFunc)
 %makeListAndConnection creates metadata text files required by VisualSFM
 %for mesh reconstruction
 denseConnectionRadius = round(framerate / (skip_frames+1));
 connectionsFilePath = strcat(pathname, filesep, connectionsFileName);
-fprintf("Creating output file: %s\n", connectionsFilePath);
+logFunc("Creating output file: %s", connectionsFilePath);
 connectfid = fopen(connectionsFilePath, 'wt');
 filelist = dir(strcat(pathname ,filesep, imgResultFilePrefix, '*.jpg'));
 listfid = fopen(strcat(pathname, filesep,'list.txt'), 'wt');

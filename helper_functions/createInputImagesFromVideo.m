@@ -1,19 +1,19 @@
 function [frameRate] = createInputImagesFromVideo(vidPath, net, imgResultFilePrefix, ...
-    outputFolder, frameSkip)
+    outputFolder, frameSkip, logFunc)
 %CREATEINPUTIMAGESFROMVIDEO Creates a set of input images for mesh reconstruction
 %(usually through VSFM)
 frameCounter = 0;
-fprintf("Reading video\n");
+logFunc("Reading video");
 v = VideoReader([vidPath.folder, filesep, vidPath.name]);
 frameRate = v.frameRate; % TODO: what shold we return as frameRate if not using video???
 numberOfFrames = round(frameRate * v.Duration);
-fprintf("Finished reading video, processing frames\n");
+logFunc("Finished reading video, processing frames");
 while hasFrame(v)
     frame = readFrame(v);
     processVidFrame(frame, net, imgResultFilePrefix, frameCounter, outputFolder);
     frameCounter = frameCounter + frameSkip + 1;
-    fprintf("curTime: %d seconds, curFrame: %04d/%04d\n", v.CurrentTime, frameCounter, ...
-        numberOfFrames);
+    logFunc("Current time: %0.3f seconds, current frame: %04d/%04d", ...
+		v.CurrentTime, frameCounter, numberOfFrames);
      tempCounter=0;
      while (tempCounter < frameSkip)
         try
