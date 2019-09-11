@@ -355,7 +355,7 @@ function browseVSFM_Callback(~, ~, handles)
 % hObject    handle to browseVSFM (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-browseDir(handles.vsfmPathInput);
+browseFile(handles.vsfmPathInput, "*.*");
 
 % --- Executes on button press in browseNIRSModel.
 function browseNIRSModel_Callback(~, ~, handles)

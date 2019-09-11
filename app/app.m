@@ -75,12 +75,8 @@ function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 varargin = getProp(handles, 'varargin');
-%modelMeshPath = "C:\TEMP\SagiFirstCutReconPoisson2.ply";
-%modelMeshPath = "C:\TEMP\SagiUpdatedAdult-Reconstructed-Edited2.ply";
 modelMeshPath = varargin{3};
-%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
-plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
-toolPath = sprintf('%s', varargin{4});
+toolPath = sprintf("""%s"""', varargin{4});
 vidPath = dir(varargin{2});
 vidPath = vidPath(1);
 mniModelPath = varargin{7};
@@ -92,22 +88,21 @@ radiusToStickerRatio = varargin{13};
 spmPath = varargin{6};
 spmFNIRSPath = varargin{8};
 capNetModelPath = fullfile('capnet', filesep, 'model.mat');
+outputDir = varargin{14};
+plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
+setProp(handles, 'outputDir', plyToPosOutputDir);
+
+setStatusText(handles, "Loading CapNet data");
+data = load(capNetModelPath); 
+net = data.net;
 
 % Name of nvm file outputed by VSFM
 vsfmOutputFileName = "dense"; 
-
-setStatusText(handles, "Loading CapNet data");
-%data = load(capNetModelPath); 
-%net = data.net;
-
-% TODO: use video name/date for output folder?
-% Create output directory if needed
-outputDir = sprintf('%s%sresults%sadult_stride_%d', pwd, filesep, filesep, frameSkip+1);
-plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
-setProp(handles, 'outputDir', plyToPosOutputDir);
-%vsfmInputDir = fullfile(outputDir, "vsfmInput");
-%plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
-%    frameSkip);
+vsfmInputDir = fullfile(outputDir, "vsfmInput");
+plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
+    frameSkip, @(msg, varargin) setStatusText(handles, msg, varargin{:}));
+%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
+%plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
 
 % TODO: decide if in video foler or not
 % Video folder should also contain a stickerHSV.txt file, which contains a
@@ -119,7 +114,6 @@ stickerHSVPath = varargin{9};
 load(stickerHSVPath, 'stickerHSV');
 % Path of the shimadzu output file
 shimadzuFilePath = varargin{10};
-%shimadzuFilePath = strcat(vidDir, filesep, shimadzuFileName, ".txt");
 setProp(handles, 'shimadzuFilePath', shimadzuFilePath);
 
 addpath(spmPath, genpath(spmFNIRSPath));
@@ -489,7 +483,7 @@ end
 % If successful regulation parameters were found, then bestMate should be
 % the same length as capStars, meaning we labeled all existing stars
 capLabels = modelStarLabels(mate);
-text(capStars(:, 1), capStars(:, 2), capStars(:, 3), capLabels, 'color', [0,0,1]);
+text(capStars(:, 1), capStars(:, 2), capStars(:, 3), capLabels, 'color', [0,1,0]);
 setStatusText(handles, ...
     "Successfuly labeled stickers, performing grid search of axis-aligned scaling");
 
@@ -541,7 +535,7 @@ shimadzuFilePath = getProp(handles, 'shimadzuFilePath');
 nirsModelPath = getProp(handles, 'nirsModelPath');
 outputDir = getProp(handles, 'outputDir');
 setStatusText(handles, "Final preparations + running spm to create POS file");
-clf;
+figure;
 createPOS(outputDir, nirsModelPath, shimadzuFilePath, modelMNILabels, subX, subY, subZ);
 end
 

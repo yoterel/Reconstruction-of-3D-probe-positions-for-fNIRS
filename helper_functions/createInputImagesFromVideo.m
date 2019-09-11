@@ -1,11 +1,14 @@
 function [frameRate] = createInputImagesFromVideo(vidPath, net, imgResultFilePrefix, ...
-    outputFolder, frameSkip, logFunc)
+    outputFolder, frameSkip, logFunc, skipVid)
 %CREATEINPUTIMAGESFROMVIDEO Creates a set of input images for mesh reconstruction
 %(usually through VSFM)
 frameCounter = 0;
 logFunc("Reading video");
 v = VideoReader([vidPath.folder, filesep, vidPath.name]);
 frameRate = v.frameRate; % TODO: what shold we return as frameRate if not using video???
+if nargin >= 7 && skipVid
+    return;
+end
 numberOfFrames = round(frameRate * v.Duration);
 logFunc("Finished reading video, processing frames");
 while hasFrame(v)

@@ -6,6 +6,25 @@ vidPlyPath = fullfile(resultsDir, "dense.0.ply");
 cleanedVidPlyPath = fullfile(resultsDir, "cleaned.ply");
 reconstructedPlyPath = fullfile(resultsDir, "reconstructed3.ply");
 
+function createMniForModelCheck()
+load("C:\temp\createmniformodel.mat");
+hold on;
+pcshow(bestProjStars, [1, 0, 0], 'MarkerSize', 100);
+pcshow(plyStars, [0, 1, 0], 'MarkerSize', 100);
+pcshow(pc);
+
+plyFile = "C:\TEMP\SagiUpdatedAdultCleaned-1.4-3.ply";
+pc = pcread(plyFile);
+hold on;
+pcshow(pc);
+load("C:\TEMP\NewModelMNI.mat", 'modelMNI');
+modelMNIPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z];
+numModelMNIPoints = size(modelMNIPoints, 1);
+headAndCapIdxs = (numModelMNIPoints-8):numModelMNIPoints; 
+modelStars = modelMNIPoints(headAndCapIdxs, :); % Coordinates of stars on model
+pcshow(modelStars, [1, 0, 0], 'MarkerSize', 100);
+end
+
 function scatterVsPCShowDemo()
 hold on;
 points = [1,1,1;2,2,2;3,3,3;4,4,4];

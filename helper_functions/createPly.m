@@ -30,7 +30,9 @@ function runVSFM(outputFolder, inputFolder, connectionsFileName, toolPath, vsfmO
         outputFolder, filesep, vsfmOutputFileName, ".nvm ", inputFolder, filesep, ...
         connectionsFileName);
     vsfmCmd = strcat(toolPath, args);
-    logFunc("Running VisualSMF with the following command:\n%s\n", vsfmCmd);
-    system(vsfmCmd);
+    logFunc("Running VisualSFM. This may Take a while. Command is:\n%s", vsfmCmd);
+    if system(vsfmCmd) ~= 0
+        error("Error running VisualSFM");
+    end
 end
 
