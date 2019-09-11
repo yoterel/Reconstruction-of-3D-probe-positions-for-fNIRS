@@ -22,7 +22,7 @@ function varargout = startWindow(varargin)
 
 % Edit the above text to modify the response to help startWindow
 
-% Last Modified by GUIDE v2.5 11-Sep-2019 09:32:24
+% Last Modified by GUIDE v2.5 11-Sep-2019 12:22:21
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -308,3 +308,20 @@ if file == 0
     return;
 end
 set(handles.modelMeshPathInput, 'String', fullfile(path, file));
+
+function outputDirInput_Callback(~, ~, ~)
+% hObject    handle to outputDirInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% --- Executes during object creation, after setting all properties.
+function outputDirInput_CreateFcn(hObject, ~, ~)
+% hObject    handle to outputDirInput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
