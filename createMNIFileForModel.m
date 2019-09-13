@@ -6,6 +6,7 @@ plyFilePath = fullfile(plyFileDir, plyFileName);
 stickerHSVPath = "C:\TEMP\stickerHSV.txt";
 radiusToStickerRatio = 5;
 stickerMinGroupSize = 5;
+maxStickerHueDiff = 0.1;
 
 fprintf("Reading ply file\n");
 pc = pcread(plyFilePath);
@@ -14,7 +15,7 @@ pc = pcread(plyFilePath);
 % stricter than usual thershold for counting as sticker candidates (in
 % terms of hue) is used here.
 load(stickerHSVPath, 'stickerHSV');
-candidatesPc = getStickerCandidates(pc, stickerHSV, 0.1); 
+candidatesPc = getStickerCandidates(pc, stickerHSV, maxStickerHueDiff); 
 candidates = candidatesPc.Location;
 fprintf("Found sticker candidate vertices\n");
 
