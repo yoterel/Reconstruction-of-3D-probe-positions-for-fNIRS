@@ -1,15 +1,20 @@
-mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\FixModelMNI.mat";
-plyFileDir = "C:\TEMP";
-plyFileName = "SagiUpdatedAdultCleaned-1.4-3.ply";
-outputFileName = "NewModelMNI.mat";
+addpath("plyToPos");
+
+mniModelPath = "C:\Globus\emberson-consortium\VideoRecon\MATLAB\infantModelMNI.mat";
+plyFileDir = "C:\Users\Dean\Downloads";
+plyFileName = "infantModel.0.ply";
+outputFileName = "NewModelMNI2.mat";
 plyFilePath = fullfile(plyFileDir, plyFileName);
 stickerHSVPath = "C:\TEMP\stickerHSV.txt";
 radiusToStickerRatio = 5;
-stickerMinGroupSize = 5;
-maxStickerHueDiff = 0.1;
+stickerMinGroupSize = 15;
+maxStickerHueDiff = 0.15;
 
 fprintf("Reading ply file\n");
-pc = pcread(plyFilePath);
+% Use the first variant if reading an already processed ply, otherwise use
+% the second
+%pc = pcread(plyFilePath)
+pc = structToPointCloud(plyread(plyFilePath));
 
 % Some of the models contain green points which are also noise, so a
 % stricter than usual thershold for counting as sticker candidates (in
@@ -21,7 +26,11 @@ fprintf("Found sticker candidate vertices\n");
 
 % Use spherical approximations for the model & cap, use them to scale and translate the sticker
 % candidate vertices on the cap (one can scale modelStars instead, as done before in a comment)
-load(mniModelPath, 'modelMNI');
+% Use the first variant if the model.mni file is for an infant, otherwise
+% use the second variant.
+load(mniModelPath, 'infantModelMNI');
+modelMNI = infantModelMNI;
+%load(mniModelPath, 'modelMNI');
 modelPoints = [modelMNI.X, modelMNI.Y, modelMNI.Z]; 
 [~, modelSphereR, scale, translate] = sphereScaleAndTranslate(candidates, modelPoints);
 modelPoints = modelPoints * scale + translate;
