@@ -144,7 +144,8 @@ setProp(handles, 'stickerHSV', stickerHSV);
 setProp(handles, 'radiusToStickerRatio', radiusToStickerRatio);
 setProp(handles, 'stickerMinGroupSize', stickerMinGroupSize);
 postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
-    stickerMinGroupSize, rfM, rvM)
+    stickerMinGroupSize, rfM, rvM);
+set(handles.tryagainbtn, 'Enable', 'on');
 end
 
 function postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
@@ -178,8 +179,7 @@ colors = pc.Color;
 r = colors(:, 1);
 g = colors(:, 2);
 b = colors(:, 3);
-rgbThreshold = 5;
-mask = (r > rgbThreshold) | (g > rgbThreshold) | (b > rgbThreshold);
+mask = (r > 50) | (g > 70) | (b > 50);
 pc = filterPcPoints(pc, mask);
 pcshow(pc);
 end
@@ -276,7 +276,7 @@ movingPc = pctransform(movingPc, affine3d(tform));
 end
 
 function [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
-    handles, pc, modelPc, bestRmse, vM, fM, rotationsPerAxis)
+    handles, pc, modelPc, bestRmse, vM, fM, rotationsPerAxis, changeThreshold)
 %COMBINEDROTATIONICP Runs ICP several times with different initial
 %rotations of the given point cloud in several axes to try to avoid local
 %minima problems. The number of rotations is rotationsPerAxis^3 - 1: all
@@ -285,6 +285,9 @@ function [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
 angleStep = 360 / rotationsPerAxis;
 bestPrepRotation = eye(3);
 bestTformedPc = pc;
+if nargin < 8
+    changeThreshold = 0;
+end
 for i = 1:rotationsPerAxis
     for j = 1:rotationsPerAxis
         for k = 1:rotationsPerAxis
@@ -292,8 +295,8 @@ for i = 1:rotationsPerAxis
                 continue;
             end
             prepRotation = rotx(i * angleStep) * roty(j * angleStep) * rotz(k * angleStep);
-            [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
-            if rmse < bestRmse
+            [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
+            if rmse < bestRmse && getChangeValue(icpTform, prepRotation) >= changeThreshold
                 bestTformedPc = tformedPc;
                 bestRmse = rmse;
                 bestPrepRotation = prepRotation;
@@ -323,7 +326,7 @@ angleStep = 360 / rotationsX;
 for i = 1:(rotationsX - 1)
     prepRotation = rotx(i * angleStep);
     [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
+    if rmse < bestRmse && getChangeValue(icpTform, prepRotation) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -337,7 +340,7 @@ angleStep = 360 / rotationsY;
 for i = 1:(rotationsY - 1)
     prepRotation = roty(i * angleStep);
     [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
+    if rmse < bestRmse && getChangeValue(icpTform, prepRotation) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -351,7 +354,7 @@ angleStep = 360 / rotationsZ;
 for i = 1:(rotationsZ - 1)
     prepRotation = rotz(i * angleStep);
     [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
+    if rmse < bestRmse && getChangeValue(icpTform, prepRotation) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -370,7 +373,6 @@ ver1 = rvM(rfM(:,1),:);
 ver2 = rvM(rfM(:,2),:);
 ver3 = rvM(rfM(:,3),:);
 set(modelPlot, 'ButtonDownFcn', @(~,~) selectPointOnMesh(handles, ver1, ver2, ver3));
-set(handles.tryagainbtn, 'Enable', 'on');
 setProp(handles, 'pc', pc);
 end
 
@@ -646,7 +648,7 @@ function tryagainbtn_Callback(hObject, eventdata, handles)
 % hObject    handle to tryagainbtn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-%set(handles.tryagainbtn, 'Enable', 'off');
+set(hObject, 'Enable', 'off');
 pc = getProp(handles, 'pc');
 vM = getProp(handles, 'vM');
 fM = getProp(handles, 'fM');
@@ -655,10 +657,21 @@ modelSphereR = getProp(handles, 'modelSphereR');
 radiusToStickerRatio = getProp(handles, 'radiusToStickerRatio');
 stickerMinGroupSize = getProp(handles, 'stickerMinGroupSize');
 
-rotationsPerAxis = 8;
-changeThreshold = 0.001;
-[pc, bestRmse, ~] = singleAxisRotationsICP(handles, pc, pointCloud(vM), inf, ...
-    vM, fM, rotationsPerAxis, rotationsPerAxis, rotationsPerAxis, changeThreshold);
+changeThreshold = 0.4;
+rotationsPerSingleAxis = 8;
+modelPc = pointCloud(vM);
+[pc1, rmse1, ~] = singleAxisRotationsICP(handles, pc, modelPc, inf, vM, fM, ...
+    rotationsPerSingleAxis, rotationsPerSingleAxis, rotationsPerSingleAxis, changeThreshold);
+rotationsPerAxis = 4;
+[pc2, rmse2, ~] = combinedRotationsICP(handles, pc, modelPc, inf, vM, fM, ...
+    rotationsPerAxis, changeThreshold);
+if rmse1 < rmse2
+    pc = pc1;
+    bestRmse = rmse1;
+else
+    pc = pc2;
+    bestRmse = rmse2;
+end
 if bestRmse == inf
     error("Couldn't find a sufficiently different matching");
 end
@@ -666,10 +679,10 @@ postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRat
     stickerMinGroupSize, fM, vM)
 end
 
-function change = getChangeValue(tform)
+function change = getChangeValue(tform, prepRotation)
 tformMatrix = tform.T;
-rotation = tformMatrix(1:3,1:3);
-change = 1 - max(abs(rotation(1,1)), abs(rotation(2,2)));
+rotation = tformMatrix(1:3,1:3) * prepRotation;
+change = 1 - max(rotation(1,1), rotation(2,2));
 end
 
 %#ok<*DEFNU>
