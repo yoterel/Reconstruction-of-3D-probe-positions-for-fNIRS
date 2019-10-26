@@ -22,7 +22,7 @@ function varargout = app(varargin)
 
 % Edit the above text to modify the response to help app
 
-% Last Modified by GUIDE v2.5 10-Sep-2019 13:59:06
+% Last Modified by GUIDE v2.5 25-Oct-2019 18:06:22
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -76,7 +76,7 @@ function varargout = app_OutputFcn(hObject, eventdata, handles)  %#ok<*INUSL>
 varargout{1} = handles.output;
 varargin = getProp(handles, 'varargin');
 modelMeshPath = varargin{3};
-toolPath = sprintf("""%s"""', varargin{4});
+toolPath = sprintf("""%s""", varargin{4});
 vidPath = dir(varargin{2});
 vidPath = vidPath(1);
 mniModelPath = varargin{7};
@@ -102,7 +102,7 @@ vsfmInputDir = fullfile(outputDir, "vsfmInput");
 plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
     frameSkip, @(msg, varargin) setStatusText(handles, msg, varargin{:}));
 %plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
-%plyFilePath = "C:\GIT\CapNet\results\adult14_stride_5\dense.0.ply";
+%plyFilePath = "C:\TEMP\Output\Sagi-Infant-2\dense.0.ply";
 
 % TODO: decide if in video foler or not
 % Video folder should also contain a stickerHSV.txt file, which contains a
@@ -136,8 +136,19 @@ setProp(handles, 'modelSphereR', modelSphereR);
 setProp(handles, 'modelMNIPoints', modelMNIPoints);
 setProp(handles, 'modelMNILabels', modelMNILabels);
 showPcAndModel(handles, pc, rvM, rfM);
-
 [pc, ~, ~, bestRmse] = icpAdjustPcToModel(handles, pc, rvM, rfM);
+
+setProp(handles, 'vM', rvM);
+setProp(handles, 'fM', rfM);
+setProp(handles, 'stickerHSV', stickerHSV);
+setProp(handles, 'radiusToStickerRatio', radiusToStickerRatio);
+setProp(handles, 'stickerMinGroupSize', stickerMinGroupSize);
+postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
+    stickerMinGroupSize, rfM, rvM)
+end
+
+function postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
+    stickerMinGroupSize, rfM, rvM)
 setStatusText(handles, ...
     "Matched video ply with model, best RMSE is: %f. Calculating existing sticker positions", ...
     bestRmse);
@@ -255,13 +266,13 @@ else
 end
 end
 
-function [tformedPc, rmse] = tformAndICP(movingPc, fixedPc, scale, rotation)
+function [tformedPc, rmse, icpTform] = tformAndICP(movingPc, fixedPc, scale, rotation)
 if nargin < 4
     rotation = eye(3);
 end
 tform = getTransformationMatrix(scale, zeros(1, 3), rotation);
 movingPc = pctransform(movingPc, affine3d(tform));
-[~, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
+[icpTform, tformedPc, rmse] = pcregistericp(movingPc, fixedPc);
 end
 
 function [bestTformedPc, bestRmse, bestPrepRotation] = combinedRotationsICP(...
@@ -297,19 +308,22 @@ end
 end
 
 function [bestTformedPc, bestRmse, bestPrepRotation] = singleAxisRotationsICP(...
-    handles, pc, modelPc, bestRmse, vM, fM, rotationsX, rotationsY, rotationsZ)
+    handles, pc, modelPc, bestRmse, vM, fM, rotationsX, rotationsY, rotationsZ, changeThreshold)
 %COMBINEDROTATIONICP Runs ICP several times with different initial
 %rotations of the given point cloud (each rotation in a single axis) to try
 %to avoid local minima problems. The number of rotations is rotationsX +
 %rotationsY + rotationsZ - 3 (trivial rotations aren't tested).
 bestPrepRotation = eye(3);
 bestTformedPc = pc;
+if nargin < 10
+    changeThreshold = 0;
+end
 
 angleStep = 360 / rotationsX;
 for i = 1:(rotationsX - 1)
     prepRotation = rotx(i * angleStep);
-    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse
+    [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -322,8 +336,8 @@ end
 angleStep = 360 / rotationsY;
 for i = 1:(rotationsY - 1)
     prepRotation = roty(i * angleStep);
-    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse
+    [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -336,8 +350,8 @@ end
 angleStep = 360 / rotationsZ;
 for i = 1:(rotationsZ - 1)
     prepRotation = rotz(i * angleStep);
-    [tformedPc, rmse] = tformAndICP(pc, modelPc, 1, prepRotation);
-    if rmse < bestRmse
+    [tformedPc, rmse, icpTform] = tformAndICP(pc, modelPc, 1, prepRotation);
+    if rmse < bestRmse && getChangeValue(icpTform) >= changeThreshold
         bestTformedPc = tformedPc;
         bestRmse = rmse;
         bestPrepRotation = prepRotation;
@@ -356,6 +370,8 @@ ver1 = rvM(rfM(:,1),:);
 ver2 = rvM(rfM(:,2),:);
 ver3 = rvM(rfM(:,3),:);
 set(modelPlot, 'ButtonDownFcn', @(~,~) selectPointOnMesh(handles, ver1, ver2, ver3));
+set(handles.tryagainbtn, 'Enable', 'on');
+setProp(handles, 'pc', pc);
 end
 
 function selectPointOnMesh(handles, ver1, ver2, ver3)
@@ -442,7 +458,7 @@ numSelected = size(selectedPoints, 1);
 numExistingStickers = getProp(handles, 'numExistingStickers');
 numLeft = 9 - numExistingStickers - numSelected;
 if numLeft > 0
-    ptOnModel = getappdata(handles.selected_pts, 'ptOnModel');
+    ptOnModel = getProp(handles, 'ptOnModel');
     setProp(handles, 'selectedPts', [selectedPoints;ptOnModel]);
     delete(getProp(handles, 'ptOnModelPlot'));
     hold on;
@@ -545,32 +561,12 @@ set(handles.select_pt_btn, 'Enable', 'on');
 setStatusText(handles, "No more stickers to select, confirm selections");
 end
 
-function selected_pts_CreateFcn(~, ~, ~)
-end
-
-% --- Executes on selection change in selected_pts.
-function selected_pts_Callback(~, ~, handles)
-% hObject    handle to selected_pts (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns selected_pts contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from selected_pts
-end
-
-% --- Executes on button press in remove_pt_btn.
-function remove_pt_btn_Callback(~, ~, handles)
-% hObject    handle to remove_pt_btn (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-end
-
 function val = getProp(handles, name)
-val = getappdata(handles.selected_pts, name);
+val = getappdata(handles.select_pt_btn, name);
 end
 
 function setProp(handles, name, val)
-setappdata(handles.selected_pts, name, val);
+setappdata(handles.select_pt_btn, name, val);
 end
 
 function compare_pc_and_model(handles, plyFilePath, modelMeshPath)
@@ -643,6 +639,37 @@ end
 meshPlot = plotMesh(rfM, rvM);
 set(meshPlot, 'ButtonDownFcn', @selectPointOnMesh);
 drawnow;
+end
+
+% --- Executes on button press in tryagainbtn.
+function tryagainbtn_Callback(hObject, eventdata, handles)
+% hObject    handle to tryagainbtn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%set(handles.tryagainbtn, 'Enable', 'off');
+pc = getProp(handles, 'pc');
+vM = getProp(handles, 'vM');
+fM = getProp(handles, 'fM');
+stickerHSV = getProp(handles, 'stickerHSV');
+modelSphereR = getProp(handles, 'modelSphereR');
+radiusToStickerRatio = getProp(handles, 'radiusToStickerRatio');
+stickerMinGroupSize = getProp(handles, 'stickerMinGroupSize');
+
+rotationsPerAxis = 8;
+changeThreshold = 0.001;
+[pc, bestRmse, ~] = singleAxisRotationsICP(handles, pc, pointCloud(vM), inf, ...
+    vM, fM, rotationsPerAxis, rotationsPerAxis, rotationsPerAxis, changeThreshold);
+if bestRmse == inf
+    error("Couldn't find a sufficiently different matching");
+end
+postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
+    stickerMinGroupSize, fM, vM)
+end
+
+function change = getChangeValue(tform)
+tformMatrix = tform.T;
+rotation = tformMatrix(1:3,1:3);
+change = 1 - max(abs(rotation(1,1)), abs(rotation(2,2)));
 end
 
 %#ok<*DEFNU>
