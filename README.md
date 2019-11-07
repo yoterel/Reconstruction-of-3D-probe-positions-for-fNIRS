@@ -1,5 +1,5 @@
 # Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
-## Users’ Guide
+## Users Guide
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video of the measurement process. It runs the entire processing pipeline, beginning in processing the video itself and concluding with producing a POS file with the cap’s position in MNI coordinates.
 First, upon the application’s lunch, the user must provide several inputs in the start window (more details about the inputs further down). After clicking submit, the rest of the stages are executed sequentially. The flow of the application is roughly divided into the following stages:
 1.	Load and process the video
@@ -29,7 +29,7 @@ Upon launch, the application requires several input parameters:
 -	Frame skip: the number of video frames to skip for each processed video frame. Default is 4
 -	Sticker minimal group size: the minimal size of a cluster of points the generated point cloud for it to be considered as a separate sticker. Default is 5
 -	Radius to sticker ratio: the (minimal) ratio between the radius of the sphere approximating the cap to the size of a sticker on the cap. As this value becomes larger, only smaller clusters will be considered to be separate stickers
-## Developers’/Technical Users’ Guide
+## Developers / Technical Users Guide
 Creating an MNI.mat File for a New Cap
 Each run of the application requires a file similar in structure to FixModelMNI.mat, which contains information about the locations of all key points on the probing cap. Since changing reconstructed model ply files might occur relatively frequently (especially if new caps are introduced), the project contains a script which allows generating the relevant *MNI.mat file automatically for the new ply. 
 The script is called createMNIFileForModel.m and is directly in the root folder of the project. It works by taking a previously created *MNI.mat file and the new model ply as an input, locating the stickers in the new ply, and then calculating the rotation, translation and scaling between the model represented by the old .mat file to the one in the new ply file. These transformations are then applied to the provided *MNI.mat file to create the new file. 
