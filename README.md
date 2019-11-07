@@ -1,4 +1,4 @@
-### Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
+# Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
 ## Users’ Guide
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video of the measurement process. It runs the entire processing pipeline, beginning in processing the video itself and concluding with producing a POS file with the cap’s position in MNI coordinates.
 First, upon the application’s lunch, the user must provide several inputs in the start window (more details about the inputs further down). After clicking submit, the rest of the stages are executed sequentially. The flow of the application is roughly divided into the following stages:
