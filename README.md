@@ -18,7 +18,7 @@ First, upon the application’s lunch, the user must provide several inputs in t
 -	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions)
 -	[x] The MATLAB SPM package
 -	[x] The MATLAB SPM fNIRS package
-- [] Python? This needs to be checked.
+- [ ] Python? This needs to be checked.
 ### Input to the application:
 Upon launch, the application requires several input parameters:
 -	Video path: the path to an .mp4 video file of the participant during the measurement process
