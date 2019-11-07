@@ -1,5 +1,5 @@
 # Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
-## Users Guide
+## User Guide
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video of the measurement process. It runs the entire processing pipeline, beginning in processing the video itself and concluding with producing a POS file with the cap’s position in MNI coordinates.
 First, upon the application’s lunch, the user must provide several inputs in the start window (more details about the inputs further down). After clicking submit, the rest of the stages are executed sequentially. The flow of the application is roughly divided into the following stages:
 1.	Load and process the video
@@ -10,25 +10,25 @@ First, upon the application’s lunch, the user must provide several inputs in t
 ### Application dependencies:
 -	[x] A version of MATLAB which supports 2018b and 2019a code
 -	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions)
--	[x] The MATLAB SPM package
--	[x] The MATLAB SPM fNIRS package
-- [ ] Python? This needs to be checked.
+-	[x] The MATLAB [SPM](https://www.fil.ion.ucl.ac.uk/spm/) package
+-	[x] The MATLAB [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/) package
+- [ ] Python?
 ### Input to the application:
 Upon launch, the application requires several input parameters:
--	Video path: the path to an .mp4 video file of the participant during the measurement process
--	Model mesh path: the path to a .ply file which is a mesh of the model of the cap, prepared ahead of time, and later on displayed to allow selecting missing points
--	Visual SFM path: path to the Visual SFM executable.
--	NIRS model path: path to a MATLAB file containing information about the NIRS model (such as NIRS_adult.mat)
--	MNI model path: path to a MATLAB file containing the positions of all key points on the head and probing cap (not just the stickers) in the model mesh. It can be generated from FixModelMNI.mat using the createMNIFileForModel.m script
--	Output directory: path to a directory in which all the output files (including intermediate files and the POS file) will be saved. It doesn’t have to be created prior to running the application
--	SPM path: path to the SPM installation directory
--	SPM FNIRS path: path to the SPM fNIRS installation directory
--	Shimadzu file path: path to the shimadzu text file (such as adult.txt)
--	Sticker HSV path: path to a file containing the HSV color of the stickers of the cap in the video (such as stickerHSV.txt)
+-	[x] Video path: the path to the raw .mp4 video file of the participant.
+-	[x] Model mesh path: the path to a .ply file which is a mesh of the model of the cap, prepared ahead of time, and later on displayed to allow selecting missing points.
+-	[x] Visual SFM path: path to the [Visual SFM](http://ccwu.me/vsfm/) executable.
+-	[ ] NIRS model path: path to a MATLAB file containing information about the NIRS model (such as NIRS_adult.mat)
+-	[ ] MNI model path: path to a MATLAB file containing the positions of all key points on the head and probing cap (not just the stickers) in the model mesh. It can be generated from FixModelMNI.mat using the createMNIFileForModel.m script
+-	[x] Output directory: path to a directory in which all the output files (including intermediate files and the POS file) will be saved. It doesn’t have to be created prior to running the application
+-	[ ] SPM path: path to the SPM installation directory
+-	[ ] SPM FNIRS path: path to the SPM fNIRS installation directory
+-	[ ] Shimadzu file path: path to the shimadzu text file (such as adult.txt)
+-	[x] Sticker HSV path: path to a plain text file containing the HSV color of the stickers of the cap in the video (3 floats in the range [0-1], seperated by space).
 ## Advanced options for fine tuning:
 -	Frame skip: the number of video frames to skip for each processed video frame. Default is 4
--	Sticker minimal group size: the minimal size of a cluster of points the generated point cloud for it to be considered as a separate sticker. Default is 5
--	Radius to sticker ratio: the (minimal) ratio between the radius of the sphere approximating the cap to the size of a sticker on the cap. As this value becomes larger, only smaller clusters will be considered to be separate stickers
+-	Sticker minimal group size: the minimal size of a cluster of points the generated point cloud for it to be considered as a separate sticker. Default is 5.
+-	Radius to sticker ratio: the (minimal) ratio between the radius of the sphere approximating the cap to the size of a sticker on the cap. As this value becomes larger, only smaller clusters will be considered to be separate stickers. Default is 5.
 ## Developers / Technical Users Guide
 Creating an MNI.mat File for a New Cap
 Each run of the application requires a file similar in structure to FixModelMNI.mat, which contains information about the locations of all key points on the probing cap. Since changing reconstructed model ply files might occur relatively frequently (especially if new caps are introduced), the project contains a script which allows generating the relevant *MNI.mat file automatically for the new ply. 
