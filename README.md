@@ -15,16 +15,16 @@ First, upon the application’s lunch, the user must provide several inputs in t
 - [x] A model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/model.rar).
 ### Input to the application:
 Upon launch, the application requires several input parameters:
--	[x] Video path: the path to the raw .mp4 video file of the participant.
--	[x] Model mesh path: the path to a .ply file which is a mesh of the model of the cap, prepared ahead of time, and later on displayed to allow selecting missing points (See [here](example_files/adultModel.0.ply) for example).
--	[x] Visual SFM path: path to the [Visual SFM](http://ccwu.me/vsfm/) executable.
--	[ ] NIRS model path: path to a MATLAB file containing information about the NIRS model (See [here](example_files/NIRS_adult.mat) for exact format)
--	[x] MNI model path: path to a MATLAB file containing the positions of all key points on the head and probing cap (not just the stickers) in the model mesh. It can be generated from using the createMNIFileForModel.m script. Coordinates are relative to digitizer ("world space"). See [here](example_files/FixModelMNI.mat) for exact format.
--	[x] Output directory: path to a directory in which all the output files (including intermediate files and the POS file) will be saved. It doesn’t have to be created prior to running the application
--	[x] SPM path: path to the SPM12 installation directory
--	[x] SPM FNIRS path: path to the SPM fNIRS installation directory
--	[ ] Shimadzu file path: path to the shimadzu text file (See [here](example_files/adult.txt) for exact format)
--	[x] Sticker HSV path: path to a plain text file containing the HSV color of the stickers of the cap in the video (3 floats in the range [0-1], seperated by space. See [here](example_files/stickerHSV.txt) for exact format).
+- Video path: the path to the raw .mp4 video file of the participant.
+- Model mesh path: the path to a .ply file which is a mesh of the model of the cap, prepared ahead of time, and later on displayed to allow selecting missing points (See [here](example_files/AdultModelMesh.ply) for example).
+-	Visual SFM path: path to the [Visual SFM](http://ccwu.me/vsfm/) executable.
+- NIRS model path: path to a MATLAB file containing information about the NIRS model (See [here](example_files/NIRS_adult.mat) for exact format)
+- MNI model path: path to a MATLAB file containing the positions of all key points on the head and probing cap (not just the stickers) in the model mesh. It can be generated from using the createMNIFileForModel.m script. Coordinates are relative to digitizer ("world space"). See [here](example_files/FixModelMNI.mat) for exact format.
+- Output directory: path to a directory in which all the output files (including intermediate files and the POS file) will be saved. It doesn’t have to be created prior to running the application
+- SPM path: path to the SPM12 installation directory
+- SPM FNIRS path: path to the SPM fNIRS installation directory
+- Shimadzu file path: path to the shimadzu text file (See [here](example_files/adult.txt) for exact format)
+- Sticker HSV path: path to a plain text file containing the HSV color of the stickers of the cap in the video (3 floats in the range [0-1], seperated by space. See [here](example_files/stickerHSV.txt) for exact format).
 ### Advanced options for fine tuning:
 -	Frame skip: the number of video frames to skip for each processed video frame. Default is 4
 -	Sticker minimal group size: the minimal size of a cluster of points the generated point cloud for it to be considered as a separate sticker. Default is 5.
