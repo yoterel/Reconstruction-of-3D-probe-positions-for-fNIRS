@@ -12,7 +12,7 @@ First, upon the application’s lunch, the user must provide several inputs in t
 -	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions).
 -	[x] The MATLAB [SPM](https://www.fil.ion.ucl.ac.uk/spm/) package (version 12).
 -	[x] The MATLAB [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/) package.
-- [x] A model file which can be downloaded from ftp://anonymous@yotablog.com:1@ftp.yotablog.com/model.rar.
+- [x] A model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/model.rar).
 ### Input to the application:
 Upon launch, the application requires several input parameters:
 -	[x] Video path: the path to the raw .mp4 video file of the participant.
