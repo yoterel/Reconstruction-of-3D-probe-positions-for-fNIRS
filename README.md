@@ -1,5 +1,5 @@
 # Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
-## User Guide
+## Introduction
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video of the measurement process. It runs the entire processing pipeline, beginning in processing the video itself and concluding with producing a POS file with the cap’s position in MNI coordinates.
 First, upon the application’s lunch, the user must provide several inputs in the start window (more details about the inputs further down). After clicking submit, the rest of the stages are executed sequentially. The flow of the application is roughly divided into the following stages:
 1.	Load and process the video
@@ -8,11 +8,11 @@ First, upon the application’s lunch, the user must provide several inputs in t
 4.	Locate the coordinates of the stickers on the generated point cloud, and allow the user to mark the positions of the stickers that weren’t located (on top of the model mesh)
 5.	Approximate the position of the cap on the participant’s head, convert the results to MNI coordinates in the POS file
 ### Application dependencies:
--	[x] A version of MATLAB which supports 2018b and 2019a code
--	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions)
--	[x] The MATLAB [SPM](https://www.fil.ion.ucl.ac.uk/spm/) package
--	[x] The MATLAB [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/) package
-- [ ] Python?
+-	[x] A version of MATLAB which supports 2018b and 2019a code.
+-	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions).
+-	[x] The MATLAB [SPM](https://www.fil.ion.ucl.ac.uk/spm/) package (version 12).
+-	[x] The MATLAB [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/) package.
+- [x] A model file which can be downloaded from ftp://anonymous@yotablog.com:1@ftp.yotablog.com/model.rar.
 ### Input to the application:
 Upon launch, the application requires several input parameters:
 -	[x] Video path: the path to the raw .mp4 video file of the participant.
@@ -21,16 +21,19 @@ Upon launch, the application requires several input parameters:
 -	[ ] NIRS model path: path to a MATLAB file containing information about the NIRS model (such as NIRS_adult.mat)
 -	[ ] MNI model path: path to a MATLAB file containing the positions of all key points on the head and probing cap (not just the stickers) in the model mesh. It can be generated from FixModelMNI.mat using the createMNIFileForModel.m script
 -	[x] Output directory: path to a directory in which all the output files (including intermediate files and the POS file) will be saved. It doesn’t have to be created prior to running the application
--	[ ] SPM path: path to the SPM installation directory
--	[ ] SPM FNIRS path: path to the SPM fNIRS installation directory
+-	[x] SPM path: path to the SPM12 installation directory
+-	[x] SPM FNIRS path: path to the SPM fNIRS installation directory
 -	[ ] Shimadzu file path: path to the shimadzu text file (such as adult.txt)
 -	[x] Sticker HSV path: path to a plain text file containing the HSV color of the stickers of the cap in the video (3 floats in the range [0-1], seperated by space).
-## Advanced options for fine tuning:
+### Advanced options for fine tuning:
 -	Frame skip: the number of video frames to skip for each processed video frame. Default is 4
 -	Sticker minimal group size: the minimal size of a cluster of points the generated point cloud for it to be considered as a separate sticker. Default is 5.
 -	Radius to sticker ratio: the (minimal) ratio between the radius of the sphere approximating the cap to the size of a sticker on the cap. As this value becomes larger, only smaller clusters will be considered to be separate stickers. Default is 5.
-## Developers / Technical Users Guide
-Creating an MNI.mat File for a New Cap
+## More information about the application
+### CapNet model
+The neural-network architecture & weights are required for the app to work. they can be downloaded from ftp://anonymous@yotablog.com:1@ftp.yotablog.com/model.rar. Extract the file into /capnet. Notice this model was created using matlab 2018b, and is loadable only using a supporting matlab version (the model is a DAG network object).
+In particular, "semanticseg" function must be supported in your version of matlab for the model to be usable.
+### Creating a MNI.mat file for a new cap
 Each run of the application requires a file similar in structure to FixModelMNI.mat, which contains information about the locations of all key points on the probing cap. Since changing reconstructed model ply files might occur relatively frequently (especially if new caps are introduced), the project contains a script which allows generating the relevant *MNI.mat file automatically for the new ply. 
 The script is called createMNIFileForModel.m and is directly in the root folder of the project. It works by taking a previously created *MNI.mat file and the new model ply as an input, locating the stickers in the new ply, and then calculating the rotation, translation and scaling between the model represented by the old .mat file to the one in the new ply file. These transformations are then applied to the provided *MNI.mat file to create the new file. 
 The calculations performed in this script are based on the original plyToPOS.m script, but with several adaptations. In more detail, the script is composed of the following stages:
@@ -54,12 +57,12 @@ A few more notes:
 -	If not exactly 9 stickers are located in the provided ply, and error is thrown. The model ply is supposed to be clean and accurate enough so that the stickers can be properly located on it
 -	The reason a non-default maxHueDiff parameter was added (used to be only 0.1) is because some of the tested model plys had a lot of green points that were purely noise and made locating the stickers problematic
 Technical information regarding the application
-## More information about the application
--	If one wants to run the application without the part which creates the original ply, lines 96-103 in app.m (starting with data=load(…) and ending with plyFilePath =…) can be commented out, and the plyFilePath variable can be given a hard-coded value for a ply file on the computer. This can save a lot of time when working on features such as selecting points or IPC
--	Ply files generated by Visual SFM contain the properties diffuse_red/diffuse_green/diffuse_blue rather than the regular properties red/green/blue. However, MATLAB’s pointCloud object and other libraries/executbales (such as PoissonRecon.exe) expect the ply to contain the regular version. That’s why the function structToPointCloud was created. It should be combined with the function plyread which can read all of the .ply file’s properties, to create a pointCloud object with the regular color fields.
--	The file messing.m contains many demos and utility functions experimented with throughout the development process. It might contain useful snippets for developing new features and debugging the application.
-- CapNet model file can be downloaded from ftp://anonymous@yotablog.com:1@ftp.yotablog.com/model.rar.
-Notice this model was created using matlab 2018b, and is loadable only using a supporting matlab version (the model is a DAG network object).
-In particular, "semanticseg" function must be supported in your version of matlab for the model to be usable.
-- The UI: The application was developed using MATLAB’s GUIDE framework. MATLAB actually has a newer framework for developing GUIs called App Designer, but the problem is that it cannot be conveniently integrated into source control: the application is represented by a single binary file which contains the code itself, and therefore showing the difference in each commit cannot be done. GUIDE was a good enough solution, and in it, every binary file which represent a layout for a window also has a corresponding regular code file. If in the future it is decided that the look and feel of GUIDE apps isn’t good enough, the project can be converted into an App Designer application (MATLAB has tools for converting automatically).
+### Skipping pipeline stages
+If one wants to run the application without the part which creates the original ply, lines 96-103 in app.m (starting with data=load(…) and ending with plyFilePath =…) can be commented out, and the plyFilePath variable can be given a hard-coded value for a ply file on the computer. This can save a lot of time when working on features such as selecting points or IPC
+### Technical Notes
+Ply files generated by Visual SFM contain the properties diffuse_red/diffuse_green/diffuse_blue rather than the regular properties red/green/blue. However, MATLAB’s pointCloud object and other libraries/executbales (such as PoissonRecon.exe) expect the ply to contain the regular version. That’s why the function structToPointCloud was created. It should be combined with the function plyread which can read all of the .ply file’s properties, to create a pointCloud object with the regular color fields.
+### The UI
+The application was developed using MATLAB’s GUIDE framework. MATLAB actually has a newer framework for developing GUIs called App Designer, but the problem is that it cannot be conveniently integrated into source control: the application is represented by a single binary file which contains the code itself, and therefore showing the difference in each commit cannot be done. GUIDE was a good enough solution, and in it, every binary file which represent a layout for a window also has a corresponding regular code file. If in the future it is decided that the look and feel of GUIDE apps isn’t good enough, the project can be converted into an App Designer application (MATLAB has tools for converting automatically).
 More about the difference between the two frameworks can be seen here:[App Designer](https://uk.mathworks.com/products/matlab/app-designer/comparing-guide-and-app-designer.html), [MATLAB GUIDE](https://uk.mathworks.com/help/matlab/creating_guis/about-the-simple-guide-gui-example.html)
+### Experimental Features
+The file messing.m contains many demos and utility functions experimented with throughout the development process. It might contain useful snippets for developing new features and debugging the application.
