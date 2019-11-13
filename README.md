@@ -9,10 +9,12 @@ First, upon the application’s lunch, the user must provide several inputs in t
 5.	Approximate the position of the cap on the participant’s head, convert the results to MNI coordinates in the POS file
 ### Application dependencies:
 -	[x] A version of MATLAB which supports 2018b and 2019a code.
--	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions).
 -	[x] The MATLAB [SPM](https://www.fil.ion.ucl.ac.uk/spm/) package (version 12).
 -	[x] The MATLAB [SPM fNIRS](https://www.nitrc.org/projects/spm_fnirs/) package.
-- [x] A model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/model.rar).
+- [x] The MATLAB [Phased Array System Toolbox](https://www.mathworks.com/products/phased-array.html).
+- [x] The MATLAB [Computer Vision Toolbox] (https://www.mathworks.com/products/computer-vision.html).
+-	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions).
+- [x] A neural-network model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/model.rar).
 ### Input to the application:
 Upon launch, the application requires several input parameters:
 - Video path: the path to the raw .mp4 video file of the participant.
