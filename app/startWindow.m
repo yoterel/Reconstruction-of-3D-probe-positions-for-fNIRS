@@ -341,7 +341,7 @@ function browseVideo_Callback(~, ~, handles)
 % hObject    handle to browseVideo (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-browseFile(handles.vidPathInput, '.mp4');
+browseFile(handles.vidPathInput, 'mp4');
 
 % --- Executes on button press in browseSPM.
 function browseSPM_Callback(~, ~, handles)

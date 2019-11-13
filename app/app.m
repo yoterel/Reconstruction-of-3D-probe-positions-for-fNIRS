@@ -89,6 +89,7 @@ spmPath = varargin{6};
 spmFNIRSPath = varargin{8};
 capNetModelPath = fullfile('capnet', filesep, 'model.mat');
 outputDir = varargin{14};
+[plyExists, plyFile] = checkOutputDir(outputDir);
 plyToPosOutputDir = strcat(outputDir, filesep, "plyToPosOutput");
 setProp(handles, 'outputDir', plyToPosOutputDir);
 
@@ -97,12 +98,20 @@ data = load(capNetModelPath);
 net = data.net;
 
 % Name of nvm file outputed by VSFM
-vsfmOutputFileName = "dense"; 
-vsfmInputDir = fullfile(outputDir, "vsfmInput");
-plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
-    frameSkip, @(msg, varargin) setStatusText(handles, msg, varargin{:}));
-%plyFilePath = "C:\Globus\emberson-consortium\VideoRecon\results\adult\adult16\video1\dense.0.ply";
-%plyFilePath = "C:\TEMP\Output\Sagi-Infant-2\dense.0.ply";
+if plyExists
+    answer = questdlg('A ply file exists in output folder, Do you want to use it and skip ply creation step?', ...
+        'Use existing ply?', 'Yes', 'No', 'Yes');
+    % Handle response
+    switch answer
+        case 'Yes'
+            plyFilePath = plyFile;
+        case 'No'
+            vsfmOutputFileName = "dense"; 
+            vsfmInputDir = fullfile(outputDir, "vsfmInput");
+            plyFilePath = createPly(vidPath, outputDir, vsfmOutputFileName, vsfmInputDir, toolPath, net, ...
+                frameSkip, @(msg, varargin) setStatusText(handles, msg, varargin{:}));
+    end    
+end
 
 % TODO: decide if in video foler or not
 % Video folder should also contain a stickerHSV.txt file, which contains a
@@ -146,6 +155,16 @@ setProp(handles, 'stickerMinGroupSize', stickerMinGroupSize);
 postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
     stickerMinGroupSize, rfM, rvM);
 set(handles.tryagainbtn, 'Enable', 'on');
+end
+
+function [plyExists, plyFile] = checkOutputDir(outputDir)
+plyExists = false;
+fileList = dir(fullfile(outputDir, filesep, '*.ply'));
+listSize = size(fileList);
+if listSize(1) == 1
+    plyExists = true;
+    plyFile = fullfile(outputDir, filesep, fileList.name);
+end
 end
 
 function postIcpMatch(handles, bestRmse, stickerHSV, pc, modelSphereR, radiusToStickerRatio, ...
@@ -684,5 +703,3 @@ tformMatrix = tform.T;
 rotation = tformMatrix(1:3,1:3) * prepRotation;
 change = 1 - max(rotation(1,1), rotation(2,2));
 end
-
-%#ok<*DEFNU>
