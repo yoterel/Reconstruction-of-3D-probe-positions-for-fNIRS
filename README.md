@@ -1,4 +1,5 @@
 # Video-based motion-resilient reconstruction of 3D position for fNIRS/EEG head mounted probes
+All files in the repository are an implementation of the original paper and research which can be found [here](https://www.biorxiv.org/content/10.1101/621615v2.full).
 ## Introduction
 This application is designed to provide an accurate estimation of the position of an fNIRS probing cap on a participant’s head, based on a short video of the measurement process. It runs the entire processing pipeline, beginning in processing the video itself and concluding with producing a POS file with the cap’s position in MNI coordinates.
 First, upon the application’s lunch, the user must provide several inputs in the start window (more details about the inputs further down). After clicking submit, the rest of the stages are executed sequentially. The flow of the application is roughly divided into the following stages:
@@ -14,7 +15,7 @@ First, upon the application’s lunch, the user must provide several inputs in t
 - [x] The MATLAB [Phased Array System Toolbox](https://www.mathworks.com/products/phased-array.html).
 - [x] The MATLAB [Computer Vision Toolbox](https://www.mathworks.com/products/computer-vision.html).
 -	[x] Visual SFM (installed together with pmvs to enable dense mesh reconstructions).
-- [x] A neural-network model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/model.rar).
+- [x] A neural-network model file which can be downloaded from [here](https://www.cs.tau.ac.il/~yotamerel/models/model.rar).
 ### Input to the application:
 Upon launch, the application requires several input parameters:
 - Video path: the path to the raw .mp4 video file of the participant.
